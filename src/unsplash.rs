@@ -1,11 +1,17 @@
-use crate::config::{ImageResolution, LastPhotoInfo, UnsplashSettings};
-use crate::wallpaper::{prune_old_wallpapers, set_cosmic_wallpaper, wallpaper_storage_dir};
-use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, USER_AGENT};
-use serde::Deserialize;
+use std::sync::OnceLock;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION};
+use serde::Deserialize;
 use url::Url;
 
+use crate::config::{ImageResolution, LastPhotoInfo, UnsplashSettings};
+use crate::error::AppError;
+use crate::wallpaper::{prune_old_wallpapers, set_cosmic_wallpaper, wallpaper_storage_dir};
+
 const UNSPLASH_RANDOM_ENDPOINT: &str = "https://api.unsplash.com/photos/random";
+const USER_AGENT_VALUE: &str = concat!("cosmic-applet-unsplash/", env!("CARGO_PKG_VERSION"));
+const MAX_CACHED_WALLPAPERS: usize = 10;
 
 #[derive(Debug, Deserialize)]
 pub struct UnsplashPhoto {
@@ -24,12 +30,10 @@ pub struct PhotoUrls {
     pub raw: String,
     pub full: String,
     pub regular: String,
-    pub small: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct PhotoLinks {
-    pub html: String,
     pub download_location: Option<String>,
 }
 
@@ -47,10 +51,9 @@ struct UnsplashErrorResponse {
 /// Builds the Unsplash `/photos/random` request URL with all configured parameters.
 ///
 /// # Errors
-/// Returns an error string if the base endpoint URL cannot be parsed.
-pub fn build_random_photo_url(settings: &UnsplashSettings) -> Result<Url, String> {
-    let mut url =
-        Url::parse(UNSPLASH_RANDOM_ENDPOINT).map_err(|e| format!("Invalid endpoint URL: {e}"))?;
+/// Returns [`AppError::InvalidEndpointUrl`] if the base endpoint URL cannot be parsed.
+pub fn build_random_photo_url(settings: &UnsplashSettings) -> Result<Url, AppError> {
+    let mut url = Url::parse(UNSPLASH_RANDOM_ENDPOINT)?;
 
     {
         let mut pairs = url.query_pairs_mut();
@@ -89,137 +92,123 @@ pub fn build_random_photo_url(settings: &UnsplashSettings) -> Result<Url, String
     Ok(url)
 }
 
-/// Selects the image download URL for the requested `ImageResolution`.
+/// Selects the image download URL for the requested [`ImageResolution`].
 pub fn select_download_url(photo: &UnsplashPhoto, resolution: ImageResolution) -> String {
     match resolution {
         ImageResolution::Full => photo.urls.full.clone(),
         ImageResolution::Regular1080p => photo.urls.regular.clone(),
         ImageResolution::Raw => photo.urls.raw.clone(),
-        ImageResolution::Uhd4K => {
-            let sep = if photo.urls.raw.contains('?') {
-                '&'
-            } else {
-                '?'
-            };
-            format!(
-                "{}{}w=3840&h=2160&fit=crop&q=90&fm=jpg",
-                photo.urls.raw, sep
-            )
-        }
-        ImageResolution::Qhd1440p => {
-            let sep = if photo.urls.raw.contains('?') {
-                '&'
-            } else {
-                '?'
-            };
-            format!(
-                "{}{}w=2560&h=1440&fit=crop&q=85&fm=jpg",
-                photo.urls.raw, sep
-            )
-        }
+        ImageResolution::Uhd4K => append_imgix_params(&photo.urls.raw, 3840, 2160, 90),
+        ImageResolution::Qhd1440p => append_imgix_params(&photo.urls.raw, 2560, 1440, 85),
     }
 }
 
-fn build_http_client(access_key: &str) -> Result<reqwest::Client, String> {
-    let mut headers = HeaderMap::new();
+fn append_imgix_params(raw_url: &str, width: u32, height: u32, quality: u8) -> String {
+    let sep = if raw_url.contains('?') { '&' } else { '?' };
+    format!("{raw_url}{sep}w={width}&h={height}&fit=crop&q={quality}&fm=jpg")
+}
+
+/// Returns a shared [`reqwest::Client`] so TLS sessions and connection pools are reused
+/// across wallpaper fetches without leaking API `Authorization` headers to CDN hosts.
+fn shared_http_client() -> Result<&'static reqwest::Client, AppError> {
+    static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+    if let Some(client) = CLIENT.get() {
+        return Ok(client);
+    }
+
+    let built = reqwest::Client::builder()
+        .user_agent(USER_AGENT_VALUE)
+        .timeout(Duration::from_secs(30))
+        .build()
+        .map_err(AppError::HttpClientInit)?;
+
+    let _ = CLIENT.set(built);
+    CLIENT.get().ok_or_else(|| {
+        AppError::WallpaperCacheIo(std::io::Error::other("HTTP client initialization race"))
+    })
+}
+
+fn api_headers(access_key: &str) -> Result<HeaderMap, AppError> {
+    let mut headers = HeaderMap::with_capacity(3);
     let auth_val = HeaderValue::from_str(&format!("Client-ID {access_key}"))
-        .map_err(|_| "Invalid characters in Unsplash Access Key".to_string())?;
+        .map_err(|_| AppError::InvalidAccessKeyHeader)?;
     headers.insert(AUTHORIZATION, auth_val);
     headers.insert("Accept-Version", HeaderValue::from_static("v1"));
     headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
-    headers.insert(
-        USER_AGENT,
-        HeaderValue::from_static("cosmic-applet-unsplash/0.1.0"),
-    );
-
-    reqwest::Client::builder()
-        .default_headers(headers)
-        .timeout(Duration::from_secs(30))
-        .build()
-        .map_err(|e| format!("Failed to initialize HTTP client: {e}"))
+    Ok(headers)
 }
 
-async fn request_random_photo(client: &reqwest::Client, url: Url) -> Result<UnsplashPhoto, String> {
+async fn request_random_photo(
+    client: &reqwest::Client,
+    url: Url,
+    headers: HeaderMap,
+) -> Result<UnsplashPhoto, AppError> {
     let response = client
         .get(url)
+        .headers(headers)
         .send()
         .await
-        .map_err(|e| format!("Network error contacting Unsplash API: {e}"))?;
+        .map_err(AppError::ApiRequest)?;
 
     let status = response.status();
-    let body_text = response
-        .text()
-        .await
-        .map_err(|e| format!("Failed to read Unsplash API response: {e}"))?;
+    let body_text = response.text().await.map_err(AppError::ApiRequest)?;
 
     if !status.is_success() {
-        if let Ok(err_resp) = serde_json::from_str::<UnsplashErrorResponse>(&body_text) {
-            if let Some(errors) = err_resp.errors {
-                if !errors.is_empty() {
-                    return Err(format!(
-                        "Unsplash API error ({status}): {}",
-                        errors.join("; ")
-                    ));
-                }
-            }
-        }
-        return Err(format!("Unsplash API returned HTTP {status}: {body_text}"));
+        let details = serde_json::from_str::<UnsplashErrorResponse>(&body_text)
+            .ok()
+            .and_then(|resp| resp.errors)
+            .filter(|errs| !errs.is_empty())
+            .map_or(body_text, |errs| errs.join("; "));
+        return Err(AppError::ApiStatus { status, details });
     }
 
-    serde_json::from_str(&body_text)
-        .map_err(|e| format!("Failed to parse Unsplash photo metadata: {e}"))
+    serde_json::from_str(&body_text).map_err(AppError::InvalidMetadata)
 }
 
 /// Fetches a random photo from Unsplash according to `settings`, downloads the image,
 /// and applies it as the COSMIC desktop wallpaper.
 ///
 /// # Errors
-/// Returns an error string if the API key is missing, the HTTP request fails,
+/// Returns [`AppError`] if the API key is missing, the HTTP request fails,
 /// the image cannot be saved to disk, or `cosmic-bg` configuration cannot be updated.
 pub async fn fetch_and_apply_wallpaper(
-    settings: UnsplashSettings,
-) -> Result<LastPhotoInfo, String> {
-    let access_key = settings.effective_access_key();
-    if access_key.is_empty() {
-        return Err("Please enter your Unsplash Access Key in the settings above.".to_string());
-    }
+    settings: &UnsplashSettings,
+) -> Result<LastPhotoInfo, AppError> {
+    let access_key = settings
+        .effective_access_key()
+        .ok_or(AppError::MissingAccessKey)?;
 
-    let url = build_random_photo_url(&settings)?;
-    let client = build_http_client(&access_key)?;
-    let photo = request_random_photo(&client, url).await?;
+    let url = build_random_photo_url(settings)?;
+    let client = shared_http_client()?;
+    let headers = api_headers(&access_key)?;
+    let photo = request_random_photo(client, url, headers.clone()).await?;
 
     // Per Unsplash API guidelines, trigger the download_location endpoint when a photo is used.
     if let Some(download_loc) = &photo.links.download_location {
-        let _ = client.get(download_loc).send().await;
+        let _ = client.get(download_loc).headers(headers).send().await;
     }
 
+    // Download the image from the CDN without forwarding our API Authorization header.
     let download_url = select_download_url(&photo, settings.resolution);
     let image_resp = client
         .get(&download_url)
         .send()
         .await
-        .map_err(|e| format!("Failed to download wallpaper image: {e}"))?;
+        .map_err(AppError::ImageDownload)?;
 
     if !image_resp.status().is_success() {
-        return Err(format!(
-            "Image download failed with HTTP {}",
-            image_resp.status()
-        ));
+        return Err(AppError::ImageDownloadStatus(image_resp.status()));
     }
 
-    let image_bytes = image_resp
-        .bytes()
-        .await
-        .map_err(|e| format!("Failed to read image bytes: {e}"))?;
-
+    let image_bytes = image_resp.bytes().await.map_err(AppError::ImageDownload)?;
     if image_bytes.is_empty() {
-        return Err("Downloaded image was empty".to_string());
+        return Err(AppError::EmptyImage);
     }
 
     let storage_dir = wallpaper_storage_dir();
     tokio::fs::create_dir_all(&storage_dir)
         .await
-        .map_err(|e| format!("Failed to create wallpaper cache directory: {e}"))?;
+        .map_err(AppError::WallpaperCacheIo)?;
 
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -229,23 +218,27 @@ pub async fn fetch_and_apply_wallpaper(
         .chars()
         .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
         .collect();
-    let file_name = format!("unsplash-{safe_id}-{timestamp}.jpg");
-    let file_path = storage_dir.join(file_name);
+    let file_path = storage_dir.join(format!("unsplash-{safe_id}-{timestamp}.jpg"));
 
     tokio::fs::write(&file_path, &image_bytes)
         .await
-        .map_err(|e| format!("Failed to save wallpaper image to disk: {e}"))?;
+        .map_err(AppError::WallpaperCacheIo)?;
 
-    // Apply the downloaded file to cosmic-bg
-    set_cosmic_wallpaper(&file_path, settings.scaling_mode)?;
-
-    // Keep the cache folder tidy (retain the 10 most recent wallpapers)
-    prune_old_wallpapers(&storage_dir, 10);
+    // Offload synchronous atomic file renames and directory pruning to the blocking pool
+    // so we never block the UI async executor thread.
+    let scaling_mode = settings.scaling_mode;
+    let apply_path = file_path.clone();
+    tokio::task::spawn_blocking(move || -> Result<(), AppError> {
+        set_cosmic_wallpaper(&apply_path, scaling_mode)?;
+        prune_old_wallpapers(&storage_dir, MAX_CACHED_WALLPAPERS);
+        Ok(())
+    })
+    .await??;
 
     let description = photo
         .description
         .or(photo.alt_description)
-        .map(|s| s.trim().to_string())
+        .map(|s| s.trim().to_owned())
         .filter(|s| !s.is_empty());
 
     Ok(LastPhotoInfo {
@@ -255,6 +248,6 @@ pub async fn fetch_and_apply_wallpaper(
         description,
         width: photo.width,
         height: photo.height,
-        file_path: file_path.to_string_lossy().to_string(),
+        file_path,
     })
 }

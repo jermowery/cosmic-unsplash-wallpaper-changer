@@ -1,12 +1,5 @@
 use std::time::Duration;
 
-use crate::config::{
-    ContentFilter, ImageResolution, LastPhotoInfo, Orientation, SettingsStore, UnsplashSettings,
-    WallpaperScalingMode, APP_ID,
-};
-use crate::unsplash::fetch_and_apply_wallpaper;
-use crate::wallpaper::set_cosmic_wallpaper;
-
 use cosmic::app::Core;
 use cosmic::cosmic_theme::Spacing;
 use cosmic::iced::platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup};
@@ -17,6 +10,13 @@ use cosmic::widget::{
     Column, Row,
 };
 use cosmic::Element;
+
+use crate::config::{
+    ContentFilter, ImageResolution, LastPhotoInfo, Orientation, SettingsStore, UnsplashSettings,
+    WallpaperScalingMode, APP_ID,
+};
+use crate::unsplash::fetch_and_apply_wallpaper;
+use crate::wallpaper::set_cosmic_wallpaper;
 
 const ICON_SYMBOLIC: &str = "io.github.cosmic.AppletUnsplash-symbolic";
 
@@ -141,9 +141,8 @@ impl cosmic::Application for UnsplashApplet {
                 self.settings.scaling_mode = mode;
                 self.persist_quietly();
                 if let Some(last) = &self.settings.last_photo {
-                    let path = std::path::PathBuf::from(&last.file_path);
-                    if path.exists() {
-                        let _ = set_cosmic_wallpaper(&path, mode);
+                    if last.file_path.exists() {
+                        let _ = set_cosmic_wallpaper(&last.file_path, mode);
                     }
                 }
             }
@@ -262,7 +261,9 @@ impl UnsplashApplet {
         self.status_message = Some("Fetching wallpaper from Unsplash...".to_string());
         let current_settings = self.settings.clone();
         cosmic::task::future(async move {
-            let result = fetch_and_apply_wallpaper(current_settings).await;
+            let result = fetch_and_apply_wallpaper(&current_settings)
+                .await
+                .map_err(|e| e.to_string());
             Message::FetchCompleted(result)
         })
     }
@@ -394,19 +395,31 @@ impl UnsplashApplet {
                 Column::new()
                     .spacing(4)
                     .push(text::caption("Orientation"))
-                    .push(self.orientation_selector()),
+                    .push(segmented_selector(
+                        Orientation::ALL.into_iter().map(|o| (o, o.label())),
+                        self.settings.orientation,
+                        Message::OrientationSelected,
+                    )),
             )
             .push(
                 Column::new()
                     .spacing(4)
                     .push(text::caption("Content Safety Filter"))
-                    .push(self.content_filter_selector()),
+                    .push(segmented_selector(
+                        ContentFilter::ALL.into_iter().map(|c| (c, c.label())),
+                        self.settings.content_filter,
+                        Message::ContentFilterSelected,
+                    )),
             )
             .push(
                 Column::new()
                     .spacing(4)
                     .push(text::caption("Image Quality / Resolution"))
-                    .push(self.resolution_selector()),
+                    .push(segmented_selector(
+                        ImageResolution::ALL.into_iter().map(|r| (r, r.label())),
+                        self.settings.resolution,
+                        Message::ResolutionSelected,
+                    )),
             )
             .into()
     }
@@ -419,13 +432,23 @@ impl UnsplashApplet {
                 Column::new()
                     .spacing(4)
                     .push(text::caption("Wallpaper Scaling Mode"))
-                    .push(self.scaling_selector()),
+                    .push(segmented_selector(
+                        WallpaperScalingMode::ALL
+                            .into_iter()
+                            .map(|m| (m, m.label())),
+                        self.settings.scaling_mode,
+                        Message::ScalingModeSelected,
+                    )),
             )
             .push(
                 Column::new()
                     .spacing(4)
                     .push(text::caption("Auto-Refresh Interval"))
-                    .push(self.refresh_interval_selector()),
+                    .push(segmented_selector(
+                        UnsplashSettings::REFRESH_PRESETS,
+                        self.settings.auto_refresh_minutes,
+                        Message::AutoRefreshSelected,
+                    )),
             )
             .into()
     }
@@ -506,79 +529,28 @@ impl UnsplashApplet {
             .push(footer)
             .into()
     }
+}
 
-    fn orientation_selector(&self) -> Element<'_, Message> {
-        let mut r = Row::new().spacing(4);
-        for item in Orientation::ALL {
-            let active = self.settings.orientation == item;
-            let btn = if active {
-                button::suggested(item.label())
-            } else {
-                button::standard(item.label())
-            }
-            .on_press(Message::OrientationSelected(item));
-            r = r.push(btn);
-        }
-        r.into()
-    }
-
-    fn content_filter_selector(&self) -> Element<'_, Message> {
-        let mut r = Row::new().spacing(4);
-        for item in ContentFilter::ALL {
-            let active = self.settings.content_filter == item;
-            let btn = if active {
-                button::suggested(item.label())
-            } else {
-                button::standard(item.label())
-            }
-            .on_press(Message::ContentFilterSelected(item));
-            r = r.push(btn);
-        }
-        r.into()
-    }
-
-    fn resolution_selector(&self) -> Element<'_, Message> {
-        let mut r = Row::new().spacing(4);
-        for item in ImageResolution::ALL {
-            let active = self.settings.resolution == item;
-            let btn = if active {
-                button::suggested(item.label())
-            } else {
-                button::standard(item.label())
-            }
-            .on_press(Message::ResolutionSelected(item));
-            r = r.push(btn);
-        }
-        r.into()
-    }
-
-    fn scaling_selector(&self) -> Element<'_, Message> {
-        let mut r = Row::new().spacing(4);
-        for item in WallpaperScalingMode::ALL {
-            let active = self.settings.scaling_mode == item;
-            let btn = if active {
-                button::suggested(item.label())
-            } else {
-                button::standard(item.label())
-            }
-            .on_press(Message::ScalingModeSelected(item));
-            r = r.push(btn);
-        }
-        r.into()
-    }
-
-    fn refresh_interval_selector(&self) -> Element<'_, Message> {
-        let mut r = Row::new().spacing(4);
-        for (mins, label) in UnsplashSettings::REFRESH_PRESETS {
-            let active = self.settings.auto_refresh_minutes == mins;
-            let btn = if active {
+/// Renders a horizontal row of option buttons where the active selection is highlighted.
+fn segmented_selector<T, F>(
+    options: impl IntoIterator<Item = (T, &'static str)>,
+    selected: T,
+    on_select: F,
+) -> Element<'static, Message>
+where
+    T: Copy + PartialEq,
+    F: Fn(T) -> Message,
+{
+    options
+        .into_iter()
+        .fold(Row::new().spacing(4), |row, (value, label)| {
+            let btn = if value == selected {
                 button::suggested(label)
             } else {
                 button::standard(label)
             }
-            .on_press(Message::AutoRefreshSelected(mins));
-            r = r.push(btn);
-        }
-        r.into()
-    }
+            .on_press(on_select(value));
+            row.push(btn)
+        })
+        .into()
 }

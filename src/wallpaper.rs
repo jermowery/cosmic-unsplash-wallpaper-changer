@@ -1,7 +1,9 @@
-use crate::config::{host_config_dir, WallpaperScalingMode};
 use std::fs;
-use std::io::Write;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+
+use crate::config::{host_config_dir, WallpaperScalingMode};
+use crate::error::AppError;
 
 pub const COSMIC_BG_ID: &str = "com.system76.CosmicBackground";
 
@@ -40,43 +42,41 @@ pub fn format_cosmic_bg_entry_ron(
     )
 }
 
-/// Atomically writes a file in `dir` so `cosmic-bg`'s file watcher receives a clean event.
-fn write_atomic(target: &Path, contents: &[u8]) -> Result<(), String> {
-    let parent = target
-        .parent()
-        .ok_or_else(|| "Invalid target path".to_string())?;
-    fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {e}"))?;
+/// Atomically writes `contents` to `target` via a temporary file in the same directory
+/// so `cosmic-bg`'s `inotify` watcher observes a single atomic rename event.
+fn write_atomic(target: &Path, contents: &[u8]) -> Result<(), AppError> {
+    let parent = target.parent().ok_or_else(|| {
+        AppError::CosmicBgConfigIo(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "target path has no parent directory",
+        ))
+    })?;
+    fs::create_dir_all(parent).map_err(AppError::CosmicBgConfigIo)?;
 
-    let mut tmp = tempfile::NamedTempFile::new_in(parent)
-        .map_err(|e| format!("Failed to create temp file: {e}"))?;
+    let mut tmp = tempfile::NamedTempFile::new_in(parent).map_err(AppError::CosmicBgConfigIo)?;
     tmp.write_all(contents)
-        .map_err(|e| format!("Failed to write temp file: {e}"))?;
-    tmp.flush()
-        .map_err(|e| format!("Failed to flush temp file: {e}"))?;
+        .map_err(AppError::CosmicBgConfigIo)?;
+    tmp.flush().map_err(AppError::CosmicBgConfigIo)?;
     tmp.persist(target)
-        .map_err(|e| format!("Failed to persist config file: {e}"))?;
+        .map_err(|e| AppError::CosmicBgConfigIo(e.error))?;
     Ok(())
 }
 
 /// Applies the given image path as the active COSMIC desktop wallpaper.
 ///
 /// # Errors
-/// Returns an error string if `image_path` does not exist or if the `cosmic-bg`
-/// configuration files cannot be written atomically.
+/// Returns [`AppError::WallpaperPathMissing`] if `image_path` does not exist or
+/// [`AppError::CosmicBgConfigIo`] if the `cosmic-bg` configuration files cannot be written atomically.
 pub fn set_cosmic_wallpaper(
     image_path: &Path,
     scaling_mode: WallpaperScalingMode,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     if !image_path.exists() {
-        return Err(format!(
-            "Wallpaper file does not exist: {}",
-            image_path.display()
-        ));
+        return Err(AppError::WallpaperPathMissing(image_path.to_path_buf()));
     }
 
     let bg_dir = cosmic_bg_config_dir();
-    fs::create_dir_all(&bg_dir)
-        .map_err(|e| format!("Could not create cosmic-bg config dir: {e}"))?;
+    fs::create_dir_all(&bg_dir).map_err(AppError::CosmicBgConfigIo)?;
 
     // Ensure `same-on-all` is true so `all` applies across all displays.
     let same_on_all_path = bg_dir.join("same-on-all");
@@ -97,11 +97,7 @@ pub fn set_cosmic_wallpaper(
             let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
                 continue;
             };
-            if name == "all"
-                || name == "same-on-all"
-                || name == "backgrounds"
-                || name.starts_with('.')
-            {
+            if matches!(name, "all" | "same-on-all" | "backgrounds") || name.starts_with('.') {
                 continue;
             }
             let output_ron = format_cosmic_bg_entry_ron(name, image_path, scaling_mode);

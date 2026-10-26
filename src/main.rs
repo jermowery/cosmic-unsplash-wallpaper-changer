@@ -1,15 +1,18 @@
-pub mod config;
-pub mod unsplash;
-pub mod wallpaper;
-pub mod window;
+mod config;
+mod error;
+mod unsplash;
+mod wallpaper;
+mod window;
 
-use crate::config::{ContentFilter, Orientation, SettingsStore};
+use std::process::ExitCode;
+
+use crate::config::{ContentFilter, Orientation, SettingsStore, UnsplashSettings};
+use crate::error::AppError;
 use crate::unsplash::fetch_and_apply_wallpaper;
 use crate::window::UnsplashApplet;
 
-fn print_help() {
-    println!(
-        "cosmic-applet-unsplash — COSMIC Desktop Panel Applet for Unsplash Wallpapers
+const HELP_TEXT: &str = "\
+cosmic-applet-unsplash — COSMIC Desktop Panel Applet for Unsplash Wallpapers
 
 USAGE:
     cosmic-applet-unsplash [OPTIONS]
@@ -27,115 +30,162 @@ OPTIONS:
     --orientation <ORIENT>      Orientation: any, landscape, portrait, squarish
     --content-filter <LEVEL>    Safety filter: low, high
     --featured                  Restrict to featured Unsplash photos
-    -h, --help                  Show this help message"
-    );
+    -h, --help                  Show this help message";
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum ExecutionMode {
+    #[default]
+    PanelApplet,
+    StandaloneWindow,
+    FetchNow,
+    ShowHelp,
 }
 
-fn main() -> cosmic::iced::Result {
-    let args: Vec<String> = std::env::args().skip(1).collect();
+#[derive(Debug, Default, PartialEq, Eq)]
+struct CliOptions {
+    mode: ExecutionMode,
+    save: bool,
+}
 
-    if args.iter().any(|a| a == "-h" || a == "--help") {
-        print_help();
-        return Ok(());
+fn next_flag_value<I>(args: &mut I, flag: &str) -> Result<String, AppError>
+where
+    I: Iterator<Item = String>,
+{
+    args.next()
+        .ok_or_else(|| AppError::CliUsage(format!("Missing value for '{flag}'")))
+}
+
+fn apply_cli_args<I>(args: I, settings: &mut UnsplashSettings) -> Result<CliOptions, AppError>
+where
+    I: IntoIterator<Item = String>,
+{
+    let mut opts = CliOptions::default();
+    let mut iter = args.into_iter();
+
+    while let Some(arg) = iter.next() {
+        match arg.as_str() {
+            "-h" | "--help" => {
+                opts.mode = ExecutionMode::ShowHelp;
+                return Ok(opts);
+            }
+            "--fetch-now" => opts.mode = ExecutionMode::FetchNow,
+            "-w" | "--window" => opts.mode = ExecutionMode::StandaloneWindow,
+            "--save" => opts.save = true,
+            "--featured" => settings.featured = true,
+            "--access-key" => {
+                settings.access_key = next_flag_value(&mut iter, "--access-key")?;
+            }
+            "--query" => {
+                settings.query = next_flag_value(&mut iter, "--query")?;
+            }
+            "--topics" => {
+                settings.topics = next_flag_value(&mut iter, "--topics")?;
+            }
+            "--collections" => {
+                settings.collections = next_flag_value(&mut iter, "--collections")?;
+            }
+            "--username" => {
+                settings.username = next_flag_value(&mut iter, "--username")?;
+            }
+            "--orientation" => {
+                let raw = next_flag_value(&mut iter, "--orientation")?;
+                settings.orientation = raw.parse::<Orientation>()?;
+            }
+            "--content-filter" => {
+                let raw = next_flag_value(&mut iter, "--content-filter")?;
+                settings.content_filter = raw.parse::<ContentFilter>()?;
+            }
+            other => {
+                return Err(AppError::CliUsage(format!(
+                    "Unknown option '{other}'. Run with --help for usage."
+                )));
+            }
+        }
     }
 
+    Ok(opts)
+}
+
+fn run_cli_fetch(store: &SettingsStore, mut settings: UnsplashSettings) -> Result<(), AppError> {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(AppError::WallpaperCacheIo)?;
+
+    let info = rt.block_on(fetch_and_apply_wallpaper(&settings))?;
+    println!(
+        "Successfully updated COSMIC wallpaper!\n  Photo ID:     {}\n  Photographer: {} (@{})\n  Resolution:   {}x{}\n  Saved Path:   {}",
+        info.id,
+        info.photographer,
+        info.username,
+        info.width,
+        info.height,
+        info.file_path.display()
+    );
+    settings.last_photo = Some(info);
+    let _ = store.save(&settings);
+    Ok(())
+}
+
+fn main() -> ExitCode {
     let store = SettingsStore::new();
     let mut settings = store.load();
-    let mut fetch_now = false;
-    let mut standalone_window = false;
-    let mut save_flag = false;
 
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--fetch-now" => fetch_now = true,
-            "-w" | "--window" => standalone_window = true,
-            "--save" => save_flag = true,
-            "--featured" => settings.featured = true,
-            "--access-key" if i + 1 < args.len() => {
-                i += 1;
-                settings.access_key.clone_from(&args[i]);
-            }
-            "--query" if i + 1 < args.len() => {
-                i += 1;
-                settings.query.clone_from(&args[i]);
-            }
-            "--topics" if i + 1 < args.len() => {
-                i += 1;
-                settings.topics.clone_from(&args[i]);
-            }
-            "--collections" if i + 1 < args.len() => {
-                i += 1;
-                settings.collections.clone_from(&args[i]);
-            }
-            "--username" if i + 1 < args.len() => {
-                i += 1;
-                settings.username.clone_from(&args[i]);
-            }
-            "--orientation" if i + 1 < args.len() => {
-                i += 1;
-                settings.orientation = match args[i].to_lowercase().as_str() {
-                    "any" => Orientation::Any,
-                    "portrait" => Orientation::Portrait,
-                    "squarish" => Orientation::Squarish,
-                    _ => Orientation::Landscape,
-                };
-            }
-            "--content-filter" if i + 1 < args.len() => {
-                i += 1;
-                settings.content_filter = match args[i].to_lowercase().as_str() {
-                    "high" => ContentFilter::High,
-                    _ => ContentFilter::Low,
-                };
-            }
-            _ => {}
+    let opts = match apply_cli_args(std::env::args().skip(1), &mut settings) {
+        Ok(opts) => opts,
+        Err(err) => {
+            eprintln!("Error: {err}");
+            return ExitCode::from(2);
         }
-        i += 1;
+    };
+
+    if opts.mode == ExecutionMode::ShowHelp {
+        println!("{HELP_TEXT}");
+        return ExitCode::SUCCESS;
     }
 
-    if save_flag {
+    if opts.save {
         if let Err(err) = store.save(&settings) {
             eprintln!("Warning: could not save settings: {err}");
-        } else if !fetch_now && !standalone_window {
+        } else if opts.mode == ExecutionMode::PanelApplet {
             println!("Settings saved.");
-            return Ok(());
+            return ExitCode::SUCCESS;
         }
     }
 
-    if fetch_now {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("Failed to create Tokio runtime");
-
-        match rt.block_on(fetch_and_apply_wallpaper(settings.clone())) {
-            Ok(info) => {
-                println!(
-                    "Successfully updated COSMIC wallpaper!\n  Photo ID:     {}\n  Photographer: {} (@{})\n  Resolution:   {}x{}\n  Saved Path:   {}",
-                    info.id, info.photographer, info.username, info.width, info.height, info.file_path
-                );
-                settings.last_photo = Some(info);
-                let _ = store.save(&settings);
-                return Ok(());
-            }
-            Err(err) => {
+    match opts.mode {
+        ExecutionMode::ShowHelp => ExitCode::SUCCESS,
+        ExecutionMode::FetchNow => {
+            if let Err(err) = run_cli_fetch(&store, settings) {
                 eprintln!("Error fetching wallpaper: {err}");
-                std::process::exit(1);
+                return ExitCode::FAILURE;
             }
+            ExitCode::SUCCESS
+        }
+        ExecutionMode::StandaloneWindow => {
+            let win_settings =
+                cosmic::app::Settings::default().size(cosmic::iced::Size::new(460.0, 720.0));
+            if let Err(err) = cosmic::app::run::<UnsplashApplet>(win_settings, true) {
+                eprintln!("Application error: {err}");
+                return ExitCode::FAILURE;
+            }
+            ExitCode::SUCCESS
+        }
+        ExecutionMode::PanelApplet => {
+            if let Err(err) = cosmic::applet::run::<UnsplashApplet>(false) {
+                eprintln!("Application error: {err}");
+                return ExitCode::FAILURE;
+            }
+            ExitCode::SUCCESS
         }
     }
-
-    if standalone_window {
-        let win_settings =
-            cosmic::app::Settings::default().size(cosmic::iced::Size::new(460.0, 720.0));
-        return cosmic::app::run::<UnsplashApplet>(win_settings, true);
-    }
-
-    cosmic::applet::run::<UnsplashApplet>(false)
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used)]
 mod tests {
+    use std::path::Path;
+
     use crate::config::{
         ContentFilter, ImageResolution, Orientation, UnsplashSettings, WallpaperScalingMode,
     };
@@ -144,10 +194,11 @@ mod tests {
         UnsplashPhoto,
     };
     use crate::wallpaper::format_cosmic_bg_entry_ron;
-    use std::path::Path;
+
+    use super::{apply_cli_args, ExecutionMode};
 
     #[test]
-    fn test_build_random_photo_url_with_all_options() {
+    fn build_random_photo_url_includes_configured_query_parameters() {
         let settings = UnsplashSettings {
             access_key: "test_key".into(),
             query: "mountains, nature".into(),
@@ -172,7 +223,7 @@ mod tests {
     }
 
     #[test]
-    fn test_select_download_url_resolutions() {
+    fn select_download_url_formats_imgix_parameters_for_target_resolutions() {
         let photo = UnsplashPhoto {
             id: "abc".into(),
             width: 4000,
@@ -183,10 +234,8 @@ mod tests {
                 raw: "https://images.unsplash.com/photo-abc?ixid=123".into(),
                 full: "https://images.unsplash.com/photo-abc?ixid=123&q=85".into(),
                 regular: "https://images.unsplash.com/photo-abc?ixid=123&w=1080".into(),
-                small: "https://images.unsplash.com/photo-abc?ixid=123&w=400".into(),
             },
             links: PhotoLinks {
-                html: "https://unsplash.com/photos/abc".into(),
                 download_location: None,
             },
             user: PhotoUser {
@@ -210,14 +259,51 @@ mod tests {
     }
 
     #[test]
-    fn test_format_cosmic_bg_entry_ron() {
+    fn format_cosmic_bg_entry_ron_produces_valid_cosmic_bg_state() {
         let ron_str = format_cosmic_bg_entry_ron(
             "all",
             Path::new("/home/user/.config/cosmic/com.system76.CosmicBackground/unsplash/test.jpg"),
             WallpaperScalingMode::Zoom,
         );
         assert!(ron_str.contains("output: \"all\""));
-        assert!(ron_str.contains("source: Path(\"/home/user/.config/cosmic/com.system76.CosmicBackground/unsplash/test.jpg\")"));
+        assert!(ron_str.contains(
+            "source: Path(\"/home/user/.config/cosmic/com.system76.CosmicBackground/unsplash/test.jpg\")"
+        ));
         assert!(ron_str.contains("scaling_mode: Zoom"));
+    }
+
+    #[test]
+    fn apply_cli_args_parses_flags_and_rejects_invalid_inputs() {
+        let mut settings = UnsplashSettings::default();
+        let args = [
+            "--access-key",
+            "my_key",
+            "--query",
+            "fjord",
+            "--orientation",
+            "portrait",
+            "--content-filter",
+            "high",
+            "--featured",
+            "--save",
+            "--fetch-now",
+        ]
+        .into_iter()
+        .map(String::from);
+
+        let opts = apply_cli_args(args, &mut settings).expect("valid CLI flags");
+        assert!(opts.save);
+        assert_eq!(opts.mode, ExecutionMode::FetchNow);
+        assert_eq!(settings.access_key, "my_key");
+        assert_eq!(settings.query, "fjord");
+        assert_eq!(settings.orientation, Orientation::Portrait);
+        assert_eq!(settings.content_filter, ContentFilter::High);
+        assert!(settings.featured);
+
+        let bad_orient = ["--orientation", "diagonal"].into_iter().map(String::from);
+        assert!(apply_cli_args(bad_orient, &mut settings).is_err());
+
+        let unknown_flag = ["--not-a-flag"].into_iter().map(String::from);
+        assert!(apply_cli_args(unknown_flag, &mut settings).is_err());
     }
 }

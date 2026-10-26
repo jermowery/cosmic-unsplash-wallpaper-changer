@@ -1,8 +1,13 @@
-use cosmic::cosmic_config::{Config, ConfigGet, ConfigSet};
-use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
+use std::str::FromStr;
+
+use cosmic::cosmic_config::{Config, ConfigGet, ConfigSet};
+use serde::{Deserialize, Serialize};
+
+use crate::error::AppError;
 
 pub const APP_ID: &str = "io.github.cosmic.AppletUnsplash";
 pub const CONFIG_VERSION: u64 = 1;
@@ -34,7 +39,7 @@ pub enum Orientation {
 impl Orientation {
     pub const ALL: [Self; 4] = [Self::Any, Self::Landscape, Self::Portrait, Self::Squarish];
 
-    pub fn label(self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
             Self::Any => "Any",
             Self::Landscape => "Landscape",
@@ -43,12 +48,28 @@ impl Orientation {
         }
     }
 
-    pub fn api_param(self) -> Option<&'static str> {
+    pub const fn api_param(self) -> Option<&'static str> {
         match self {
             Self::Any => None,
             Self::Landscape => Some("landscape"),
             Self::Portrait => Some("portrait"),
             Self::Squarish => Some("squarish"),
+        }
+    }
+}
+
+impl FromStr for Orientation {
+    type Err = AppError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "any" => Ok(Self::Any),
+            "landscape" => Ok(Self::Landscape),
+            "portrait" => Ok(Self::Portrait),
+            "squarish" => Ok(Self::Squarish),
+            other => Err(AppError::CliUsage(format!(
+                "Invalid orientation '{other}' (expected: any, landscape, portrait, squarish)"
+            ))),
         }
     }
 }
@@ -64,17 +85,31 @@ pub enum ContentFilter {
 impl ContentFilter {
     pub const ALL: [Self; 2] = [Self::Low, Self::High];
 
-    pub fn label(self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
             Self::Low => "Standard (Low)",
             Self::High => "Strict (High)",
         }
     }
 
-    pub fn api_param(self) -> &'static str {
+    pub const fn api_param(self) -> &'static str {
         match self {
             Self::Low => "low",
             Self::High => "high",
+        }
+    }
+}
+
+impl FromStr for ContentFilter {
+    type Err = AppError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "low" => Ok(Self::Low),
+            "high" => Ok(Self::High),
+            other => Err(AppError::CliUsage(format!(
+                "Invalid content filter '{other}' (expected: low, high)"
+            ))),
         }
     }
 }
@@ -99,7 +134,7 @@ impl ImageResolution {
         Self::Raw,
     ];
 
-    pub fn label(self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
             Self::Full => "Full",
             Self::Uhd4K => "4K UHD",
@@ -122,7 +157,7 @@ pub enum WallpaperScalingMode {
 impl WallpaperScalingMode {
     pub const ALL: [Self; 3] = [Self::Zoom, Self::Fit, Self::Stretch];
 
-    pub fn label(self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
             Self::Zoom => "Zoom (Fill)",
             Self::Fit => "Fit",
@@ -130,7 +165,7 @@ impl WallpaperScalingMode {
         }
     }
 
-    pub fn cosmic_bg_ron(self) -> &'static str {
+    pub const fn cosmic_bg_ron(self) -> &'static str {
         match self {
             Self::Zoom => "Zoom",
             Self::Fit => "Fit((0.0, 0.0, 0.0))",
@@ -148,7 +183,7 @@ pub struct LastPhotoInfo {
     pub description: Option<String>,
     pub width: u32,
     pub height: u32,
-    pub file_path: String,
+    pub file_path: PathBuf,
 }
 
 /// Persistent settings for the COSMIC Unsplash Wallpaper Applet.
@@ -210,16 +245,20 @@ impl UnsplashSettings {
         (1440, "24h"),
     ];
 
-    /// Returns the trimmed Access Key, falling back to `UNSPLASH_ACCESS_KEY` if unset in settings.
-    pub fn effective_access_key(&self) -> String {
+    /// Returns the trimmed Access Key, borrowing from `self.access_key` when set or
+    /// falling back to `UNSPLASH_ACCESS_KEY` from the process environment.
+    pub fn effective_access_key(&self) -> Option<Cow<'_, str>> {
         let trimmed = self.access_key.trim();
         if !trimmed.is_empty() {
-            return trimmed.to_string();
+            return Some(Cow::Borrowed(trimmed));
         }
-        env::var("UNSPLASH_ACCESS_KEY")
-            .unwrap_or_default()
-            .trim()
-            .to_string()
+        let env_val = env::var("UNSPLASH_ACCESS_KEY").ok()?;
+        let env_trimmed = env_val.trim();
+        if env_trimmed.is_empty() {
+            None
+        } else {
+            Some(Cow::Owned(env_trimmed.to_owned()))
+        }
     }
 }
 
@@ -268,18 +307,18 @@ impl SettingsStore {
     /// Persists `settings` to `cosmic-config` (or the RON fallback file).
     ///
     /// # Errors
-    /// Returns an error string if the fallback directory cannot be created or the RON file cannot be written.
-    pub fn save(&self, settings: &UnsplashSettings) -> Result<(), String> {
+    /// Returns [`AppError`] if the fallback directory cannot be created or the RON file cannot be written.
+    pub fn save(&self, settings: &UnsplashSettings) -> Result<(), AppError> {
         if let Some(config) = &self.config {
             if config.set(SETTINGS_KEY, settings).is_ok() {
                 return Ok(());
             }
         }
         if let Some(parent) = self.fallback_path.parent() {
-            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            fs::create_dir_all(parent).map_err(AppError::ConfigIo)?;
         }
         let pretty = ron::ser::PrettyConfig::new();
-        let serialized = ron::ser::to_string_pretty(settings, pretty).map_err(|e| e.to_string())?;
-        fs::write(&self.fallback_path, serialized).map_err(|e| e.to_string())
+        let serialized = ron::ser::to_string_pretty(settings, pretty)?;
+        fs::write(&self.fallback_path, serialized).map_err(AppError::ConfigIo)
     }
 }

@@ -35,6 +35,7 @@ A native panel applet for the **System76 COSMIC Desktop Environment** (`libcosmi
 │   └── icons/hicolor/scalable/apps/                 # Full-color and symbolic SVG panel icons
 └── src/
     ├── main.rs                 # Entry point supporting panel applet mode, --window mode, and CLI --fetch-now
+    ├── error.rs                # Structured AppError enum (thiserror) for domain error handling
     ├── window.rs               # libcosmic Application implementation, panel icon, popup UI, and timer subscription
     ├── config.rs               # UnsplashSettings data model and cosmic-config RON persistence
     ├── unsplash.rs             # Async Unsplash REST API client, URL builder, and image downloader

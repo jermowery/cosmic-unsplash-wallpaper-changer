@@ -14,6 +14,7 @@ Instructions and maintenance guidelines for AI coding agents working in the `cos
   1. Default panel applet mode (`cosmic::applet::run::<UnsplashApplet>(false)`)
   2. Standalone desktop window mode (`--window` / `-w`)
   3. Headless CLI one-shot mode (`--fetch-now`, `--save`, `--access-key`, `--query`, etc.)
+- [`src/error.rs`](src/error.rs): Structured `AppError` enum (`thiserror`) covering HTTP, JSON, RON, I/O, and CLI validation errors.
 - [`src/window.rs`](src/window.rs): `cosmic::Application` state machine, panel symbolic icon button, Wayland popup dialog layout, and `Subscription` timer for automatic wallpaper rotation.
 - [`src/config.rs`](src/config.rs): `UnsplashSettings` data structures and `SettingsStore` persistence backed by `cosmic-config` (`~/.config/cosmic/io.github.cosmic.AppletUnsplash/v1/settings`).
 - [`src/unsplash.rs`](src/unsplash.rs): Async Unsplash API client (`build_random_photo_url`, `select_download_url`, `fetch_and_apply_wallpaper`), `download_location` event reporting, and image downloading.
