@@ -265,6 +265,10 @@ impl SettingsStore {
         UnsplashSettings::default()
     }
 
+    /// Persists `settings` to `cosmic-config` (or the RON fallback file).
+    ///
+    /// # Errors
+    /// Returns an error string if the fallback directory cannot be created or the RON file cannot be written.
     pub fn save(&self, settings: &UnsplashSettings) -> Result<(), String> {
         if let Some(config) = &self.config {
             if config.set(SETTINGS_KEY, settings).is_ok() {

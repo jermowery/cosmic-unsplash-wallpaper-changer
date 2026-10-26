@@ -54,23 +54,23 @@ fn main() -> cosmic::iced::Result {
             "--featured" => settings.featured = true,
             "--access-key" if i + 1 < args.len() => {
                 i += 1;
-                settings.access_key = args[i].clone();
+                settings.access_key.clone_from(&args[i]);
             }
             "--query" if i + 1 < args.len() => {
                 i += 1;
-                settings.query = args[i].clone();
+                settings.query.clone_from(&args[i]);
             }
             "--topics" if i + 1 < args.len() => {
                 i += 1;
-                settings.topics = args[i].clone();
+                settings.topics.clone_from(&args[i]);
             }
             "--collections" if i + 1 < args.len() => {
                 i += 1;
-                settings.collections = args[i].clone();
+                settings.collections.clone_from(&args[i]);
             }
             "--username" if i + 1 < args.len() => {
                 i += 1;
-                settings.username = args[i].clone();
+                settings.username.clone_from(&args[i]);
             }
             "--orientation" if i + 1 < args.len() => {
                 i += 1;

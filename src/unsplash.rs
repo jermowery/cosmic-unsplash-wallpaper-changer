@@ -45,6 +45,9 @@ struct UnsplashErrorResponse {
 }
 
 /// Builds the Unsplash `/photos/random` request URL with all configured parameters.
+///
+/// # Errors
+/// Returns an error string if the base endpoint URL cannot be parsed.
 pub fn build_random_photo_url(settings: &UnsplashSettings) -> Result<Url, String> {
     let mut url =
         Url::parse(UNSPLASH_RANDOM_ENDPOINT).map_err(|e| format!("Invalid endpoint URL: {e}"))?;
@@ -117,18 +120,7 @@ pub fn select_download_url(photo: &UnsplashPhoto, resolution: ImageResolution) -
     }
 }
 
-/// Fetches a random photo from Unsplash according to `settings`, downloads the image,
-/// and applies it as the COSMIC desktop wallpaper.
-pub async fn fetch_and_apply_wallpaper(
-    settings: UnsplashSettings,
-) -> Result<LastPhotoInfo, String> {
-    let access_key = settings.effective_access_key();
-    if access_key.is_empty() {
-        return Err("Please enter your Unsplash Access Key in the settings above.".to_string());
-    }
-
-    let url = build_random_photo_url(&settings)?;
-
+fn build_http_client(access_key: &str) -> Result<reqwest::Client, String> {
     let mut headers = HeaderMap::new();
     let auth_val = HeaderValue::from_str(&format!("Client-ID {access_key}"))
         .map_err(|_| "Invalid characters in Unsplash Access Key".to_string())?;
@@ -140,12 +132,14 @@ pub async fn fetch_and_apply_wallpaper(
         HeaderValue::from_static("cosmic-applet-unsplash/0.1.0"),
     );
 
-    let client = reqwest::Client::builder()
+    reqwest::Client::builder()
         .default_headers(headers)
         .timeout(Duration::from_secs(30))
         .build()
-        .map_err(|e| format!("Failed to initialize HTTP client: {e}"))?;
+        .map_err(|e| format!("Failed to initialize HTTP client: {e}"))
+}
 
+async fn request_random_photo(client: &reqwest::Client, url: Url) -> Result<UnsplashPhoto, String> {
     let response = client
         .get(url)
         .send()
@@ -172,8 +166,27 @@ pub async fn fetch_and_apply_wallpaper(
         return Err(format!("Unsplash API returned HTTP {status}: {body_text}"));
     }
 
-    let photo: UnsplashPhoto = serde_json::from_str(&body_text)
-        .map_err(|e| format!("Failed to parse Unsplash photo metadata: {e}"))?;
+    serde_json::from_str(&body_text)
+        .map_err(|e| format!("Failed to parse Unsplash photo metadata: {e}"))
+}
+
+/// Fetches a random photo from Unsplash according to `settings`, downloads the image,
+/// and applies it as the COSMIC desktop wallpaper.
+///
+/// # Errors
+/// Returns an error string if the API key is missing, the HTTP request fails,
+/// the image cannot be saved to disk, or `cosmic-bg` configuration cannot be updated.
+pub async fn fetch_and_apply_wallpaper(
+    settings: UnsplashSettings,
+) -> Result<LastPhotoInfo, String> {
+    let access_key = settings.effective_access_key();
+    if access_key.is_empty() {
+        return Err("Please enter your Unsplash Access Key in the settings above.".to_string());
+    }
+
+    let url = build_random_photo_url(&settings)?;
+    let client = build_http_client(&access_key)?;
+    let photo = request_random_photo(&client, url).await?;
 
     // Per Unsplash API guidelines, trigger the download_location endpoint when a photo is used.
     if let Some(download_loc) = &photo.links.download_location {
@@ -210,8 +223,7 @@ pub async fn fetch_and_apply_wallpaper(
 
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
+        .map_or(0, |d| d.as_secs());
     let safe_id: String = photo
         .id
         .chars()

@@ -101,26 +101,7 @@ impl cosmic::Application for UnsplashApplet {
                 }
             }
             Message::TogglePopup => {
-                return if let Some(id) = self.popup.take() {
-                    self.persist_quietly();
-                    destroy_popup(id)
-                } else {
-                    let new_id = Id::unique();
-                    self.popup = Some(new_id);
-                    let mut popup_settings = self.core.applet.get_popup_settings(
-                        self.core.main_window_id().unwrap_or(Id::RESERVED),
-                        new_id,
-                        None,
-                        None,
-                        None,
-                    );
-                    popup_settings.positioner.size_limits = Limits::NONE
-                        .min_width(400.0)
-                        .max_width(440.0)
-                        .min_height(200.0)
-                        .max_height(680.0);
-                    get_popup(popup_settings)
-                };
+                return self.handle_toggle_popup();
             }
             Message::AccessKeyChanged(val) => {
                 self.settings.access_key = val;
@@ -180,36 +161,10 @@ impl cosmic::Application for UnsplashApplet {
                 }
             },
             Message::FetchNow | Message::AutoRefreshTick => {
-                if self.is_fetching {
-                    return Task::none();
-                }
-                let _ = self.store.save(&self.settings);
-                self.is_fetching = true;
-                self.error_message = None;
-                self.status_message = Some("Fetching wallpaper from Unsplash...".to_string());
-                let current_settings = self.settings.clone();
-                return cosmic::task::future(async move {
-                    let result = fetch_and_apply_wallpaper(current_settings).await;
-                    Message::FetchCompleted(result)
-                });
+                return self.start_wallpaper_fetch();
             }
             Message::FetchCompleted(result) => {
-                self.is_fetching = false;
-                match result {
-                    Ok(info) => {
-                        self.status_message = Some(format!(
-                            "Wallpaper updated: Photo by {} (@{})",
-                            info.photographer, info.username
-                        ));
-                        self.error_message = None;
-                        self.settings.last_photo = Some(info);
-                        let _ = self.store.save(&self.settings);
-                    }
-                    Err(err) => {
-                        self.status_message = None;
-                        self.error_message = Some(err);
-                    }
-                }
+                self.handle_fetch_completed(result);
             }
         }
         Task::none()
@@ -274,38 +229,64 @@ impl UnsplashApplet {
         }
     }
 
-    fn dialog_content(&self) -> Element<'_, Message> {
-        let Spacing {
-            space_xxs,
-            space_xs,
-            space_s,
-            space_m,
-            ..
-        } = cosmic::theme::spacing();
-
-        // Top header bar with title & primary action button
-        let fetch_btn_label = if self.is_fetching {
-            "Fetching..."
+    fn handle_toggle_popup(&mut self) -> Task<cosmic::Action<Message>> {
+        if let Some(id) = self.popup.take() {
+            self.persist_quietly();
+            destroy_popup(id)
         } else {
-            "New Wallpaper"
-        };
-        let mut fetch_btn = button::suggested(fetch_btn_label);
-        if !self.is_fetching {
-            fetch_btn = fetch_btn.on_press(Message::FetchNow);
+            let new_id = Id::unique();
+            self.popup = Some(new_id);
+            let mut popup_settings = self.core.applet.get_popup_settings(
+                self.core.main_window_id().unwrap_or(Id::RESERVED),
+                new_id,
+                None,
+                None,
+                None,
+            );
+            popup_settings.positioner.size_limits = Limits::NONE
+                .min_width(400.0)
+                .max_width(440.0)
+                .min_height(200.0)
+                .max_height(680.0);
+            get_popup(popup_settings)
         }
+    }
 
-        let header = Row::new()
-            .push(
-                Column::new()
-                    .push(text::title4("Unsplash Wallpaper"))
-                    .push(text::caption("COSMIC Desktop Wallpaper Applet"))
-                    .width(Length::Fill),
-            )
-            .push(fetch_btn)
-            .align_y(Alignment::Center)
-            .spacing(space_s);
+    fn start_wallpaper_fetch(&mut self) -> Task<cosmic::Action<Message>> {
+        if self.is_fetching {
+            return Task::none();
+        }
+        let _ = self.store.save(&self.settings);
+        self.is_fetching = true;
+        self.error_message = None;
+        self.status_message = Some("Fetching wallpaper from Unsplash...".to_string());
+        let current_settings = self.settings.clone();
+        cosmic::task::future(async move {
+            let result = fetch_and_apply_wallpaper(current_settings).await;
+            Message::FetchCompleted(result)
+        })
+    }
 
-        // Status / Error / Attribution banner
+    fn handle_fetch_completed(&mut self, result: Result<LastPhotoInfo, String>) {
+        self.is_fetching = false;
+        match result {
+            Ok(info) => {
+                self.status_message = Some(format!(
+                    "Wallpaper updated: Photo by {} (@{})",
+                    info.photographer, info.username
+                ));
+                self.error_message = None;
+                self.settings.last_photo = Some(info);
+                let _ = self.store.save(&self.settings);
+            }
+            Err(err) => {
+                self.status_message = None;
+                self.error_message = Some(err);
+            }
+        }
+    }
+
+    fn status_banner(&self, space_xxs: u16) -> Option<Element<'_, Message>> {
         let mut status_col = Column::new().spacing(space_xxs);
         let mut has_status = false;
         if let Some(err) = &self.error_message {
@@ -329,8 +310,11 @@ impl UnsplashApplet {
             has_status = true;
         }
 
-        // Section 1: Unsplash API Key
-        let credentials_section = Column::new()
+        has_status.then(|| status_col.into())
+    }
+
+    fn credentials_section(&self, space_xs: u16) -> Element<'_, Message> {
+        Column::new()
             .spacing(space_xs)
             .push(text::heading("Unsplash API Key"))
             .push(
@@ -346,10 +330,12 @@ impl UnsplashApplet {
                         )
                         .on_input(Message::AccessKeyChanged),
                     ),
-            );
+            )
+            .into()
+    }
 
-        // Section 2: Search & Filter Parameters (Unsplash API)
-        let search_section = Column::new()
+    fn search_section(&self, space_xs: u16) -> Element<'_, Message> {
+        Column::new()
             .spacing(space_xs)
             .push(text::heading("Search & Filter Options"))
             .push(
@@ -421,10 +407,12 @@ impl UnsplashApplet {
                     .spacing(4)
                     .push(text::caption("Image Quality / Resolution"))
                     .push(self.resolution_selector()),
-            );
+            )
+            .into()
+    }
 
-        // Section 3: Desktop Wallpaper & Rotation Options
-        let desktop_section = Column::new()
+    fn desktop_section(&self, space_xs: u16) -> Element<'_, Message> {
+        Column::new()
             .spacing(space_xs)
             .push(text::heading("Desktop & Rotation"))
             .push(
@@ -438,7 +426,39 @@ impl UnsplashApplet {
                     .spacing(4)
                     .push(text::caption("Auto-Refresh Interval"))
                     .push(self.refresh_interval_selector()),
-            );
+            )
+            .into()
+    }
+
+    fn dialog_content(&self) -> Element<'_, Message> {
+        let Spacing {
+            space_xxs,
+            space_xs,
+            space_s,
+            space_m,
+            ..
+        } = cosmic::theme::spacing();
+
+        let fetch_btn_label = if self.is_fetching {
+            "Fetching..."
+        } else {
+            "New Wallpaper"
+        };
+        let mut fetch_btn = button::suggested(fetch_btn_label);
+        if !self.is_fetching {
+            fetch_btn = fetch_btn.on_press(Message::FetchNow);
+        }
+
+        let header = Row::new()
+            .push(
+                Column::new()
+                    .push(text::title4("Unsplash Wallpaper"))
+                    .push(text::caption("COSMIC Desktop Wallpaper Applet"))
+                    .width(Length::Fill),
+            )
+            .push(fetch_btn)
+            .align_y(Alignment::Center)
+            .spacing(space_s);
 
         // Scrollable form body fills remaining height inside the fixed-height middle container
         // so dynamically added error/status lines never push the footer buttons down.
@@ -446,16 +466,16 @@ impl UnsplashApplet {
             Column::new()
                 .spacing(space_s)
                 .padding([space_s, space_m, space_s, space_s])
-                .push(credentials_section)
+                .push(self.credentials_section(space_xs))
                 .push(divider::horizontal::light())
-                .push(search_section)
+                .push(self.search_section(space_xs))
                 .push(divider::horizontal::light())
-                .push(desktop_section),
+                .push(self.desktop_section(space_xs)),
         )
         .height(Length::Fill);
 
         let mut middle_col = Column::new().spacing(space_xs);
-        if has_status {
+        if let Some(status_col) = self.status_banner(space_xxs) {
             middle_col = middle_col
                 .push(status_col)
                 .push(divider::horizontal::light());
@@ -467,7 +487,6 @@ impl UnsplashApplet {
         };
         let middle_section = middle_col.push(form_body).height(middle_height);
 
-        // Footer buttons
         let mut apply_btn = button::suggested("Save & Change Wallpaper");
         if !self.is_fetching {
             apply_btn = apply_btn.on_press(Message::FetchNow);

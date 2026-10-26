@@ -86,7 +86,7 @@ pub enum ServiceError {
     Db(#[from] DbError),
     #[error("External services error: {0}")]
     ExternalServices(#[from] ExternalHttpError)
-    
+
 }
 ```
 

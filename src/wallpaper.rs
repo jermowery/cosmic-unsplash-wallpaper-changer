@@ -59,6 +59,10 @@ fn write_atomic(target: &Path, contents: &[u8]) -> Result<(), String> {
 }
 
 /// Applies the given image path as the active COSMIC desktop wallpaper.
+///
+/// # Errors
+/// Returns an error string if `image_path` does not exist or if the `cosmic-bg`
+/// configuration files cannot be written atomically.
 pub fn set_cosmic_wallpaper(
     image_path: &Path,
     scaling_mode: WallpaperScalingMode,
@@ -121,7 +125,10 @@ pub fn prune_old_wallpapers(dir: &Path, keep_count: usize) {
                 return None;
             }
             let name = path.file_name()?.to_str()?;
-            if !name.starts_with("unsplash-") || !name.ends_with(".jpg") {
+            let is_jpg = Path::new(name)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("jpg"));
+            if !name.starts_with("unsplash-") || !is_jpg {
                 return None;
             }
             let modified = entry.metadata().ok()?.modified().ok()?;

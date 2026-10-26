@@ -2,7 +2,7 @@
 
 Many higher level languages hide memory management, typically **passing by value** (copy data) or **passing by reference** (reference to shared data) without worrying about allocation, heap, stack, ownership and lifetimes, it is all delegated to the garbage collector or VM. Here is a comparison on this topic between a few languages:
 
-### 📌 Language Comparison 
+### 📌 Language Comparison
 
 | Language   	| Value Types                         	| Reference/Pointer Types                                   	| Async Model & Types                                                        	| Manual Memory                	|
 |------------	|-------------------------------------	|-----------------------------------------------------------	|----------------------------------------------------------------------------	|------------------------------	|
@@ -34,7 +34,7 @@ Rust tracks pointers using `Send` and `Sync` traits:
 | `Mutex<T>`       	| Thread-safe interior mutability with exclusive access                     	| Yes                                  	| Shared mutable, threaded |
 | `RwLock<T>`      	| Thread-safe shared readonly access OR exclusive mutable access            	| Yes                                  	| Shared mutable, threaded |
 | `OnceCell<T>`    	| Single-thread one-time initialization container (interior mutability ONCE)    | No, not Sync                         	| Simple lazy value initialization |
-| `LazyCell<T>`    	| A lazy version of `OnceCell<T>` that calls function closure to initialize 	| No, not Sync                         	| Complex lazy value initialization 
+| `LazyCell<T>`    	| A lazy version of `OnceCell<T>` that calls function closure to initialize 	| No, not Sync                         	| Complex lazy value initialization
 | `OnceLock<T>`    	| Thread-safe version of `OnceCell<T>`                                      	| Yes                                  	| Multi-thread single init |
 | `LazyLock<T>`    	| Thread-safe version of  `LazyCell<T>`                                     	| Yes                                  	| Multi-thread complex init	|
 | `*const T/*mut T` 	| Raw Pointers                                                              	| No, user must ensure safety manually 	| Raw memory / FFI |
@@ -178,7 +178,7 @@ use std::{cell::OnceCell, rc::Rc};
 #[derive(Debug, Default)]
 struct MyStruct {
     distance: usize,
-    root: Option<Rc<OnceCell<MyStruct>>>,    
+    root: Option<Rc<OnceCell<MyStruct>>>,
 }
 
 fn main() {
