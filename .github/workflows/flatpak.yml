@@ -4,16 +4,15 @@ on:
   push:
     branches:
       - main
-      - master
     tags:
       - "v*"
   pull_request:
   workflow_dispatch:
     inputs:
       create_release:
-        description: "Publish Flatpak bundle to a GitHub Release (requires tag or release_tag)"
+        description: "Publish Flatpak bundle to a GitHub Release"
         required: false
-        default: false
+        default: true
         type: boolean
       release_tag:
         description: "Tag name to publish when triggered manually (e.g. v0.1.0)"
@@ -31,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Flatpak and flatpak-builder
         run: |
@@ -50,12 +49,10 @@ jobs:
             org.freedesktop.Sdk.Extension.rust-stable//25.08
 
       - name: Cache Flatpak builder directory
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             .flatpak-builder
-            ~/.cargo/registry
-            ~/.cargo/git
           key: flatpak-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'flatpak/**') }}
           restore-keys: |
             flatpak-${{ runner.os }}-
@@ -79,7 +76,7 @@ jobs:
           ls -lh "${BUNDLE_NAME}" "${BUNDLE_NAME}.sha256"
 
       - name: Upload Flatpak bundle artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: flatpak-bundle
           path: |
@@ -88,7 +85,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload OSTree Flatpak repository artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: flatpak-ostree-repo
           path: repo/
@@ -97,24 +94,24 @@ jobs:
   publish-release:
     name: Publish Flatpak to GitHub Releases
     needs: build-flatpak
-    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.create_release == true)
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.create_release == true)
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download Flatpak bundle artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: flatpak-bundle
           path: dist
 
       - name: Publish GitHub Release with Flatpak bundle
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || inputs.release_tag }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || inputs.release_tag || 'v0.1.0' }}
           generate_release_notes: true
           files: |
             dist/${{ env.BUNDLE_NAME }}

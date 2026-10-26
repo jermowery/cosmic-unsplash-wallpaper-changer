@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - master
   pull_request:
   workflow_dispatch:
 
@@ -17,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install system dependencies
         run: |
@@ -53,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install desktop and AppStream validators
         run: |
@@ -62,17 +61,11 @@ jobs:
 
       - name: Validate .desktop entry
         run: |
-          APPID="io.github.cosmic.AppletUnsplash"
-          output="$(desktop-file-validate "resources/${APPID}.desktop" || true)"
-          filtered="$(printf '%s\n' "${output}" \
-            | grep -v 'unregistered value "COSMIC"' \
-            | grep -v 'does not contain a registered main category' \
-            | grep -v '^$' || true)"
-          if [ -n "${filtered}" ]; then
-            printf '%s\n' "${filtered}"
-            exit 1
-          fi
-          echo "Desktop entry valid."
+          desktop-file-validate resources/io.github.cosmic.AppletUnsplash.desktop
+
+      - name: Validate AppStream metainfo XML
+        run: |
+          appstreamcli validate --no-net resources/io.github.cosmic.AppletUnsplash.metainfo.xml
 
       - name: Validate Flatpak manifest JSON
         run: |

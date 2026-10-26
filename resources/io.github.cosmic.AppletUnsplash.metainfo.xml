@@ -18,8 +18,15 @@
   </description>
   <launchable type="desktop-id">io.github.cosmic.AppletUnsplash.desktop</launchable>
   <icon type="stock">io.github.cosmic.AppletUnsplash-symbolic</icon>
+  <url type="homepage">https://github.com/jermowery/cosmic-unsplash-wallpaper-changer</url>
+  <developer id="io.github.jermowery">
+    <name>jermowery</name>
+  </developer>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="0.1.0" date="2026-10-25" />
+  </releases>
   <categories>
-    <category>COSMIC</category>
     <category>Utility</category>
   </categories>
 </component>
