@@ -1,5 +1,8 @@
 # COSMIC Unsplash Wallpaper Applet (`cosmic-applet-unsplash`)
 
+> [!WARNING]
+> **Disclaimer:** This codebase is 100% vibecoded and the author has no idea what they are doing. Use at your own risk!
+
 A native panel applet for the **System76 COSMIC Desktop Environment** (`libcosmic`) that downloads photos from [Unsplash](https://unsplash.com) and sets them as your COSMIC desktop wallpaper via `cosmic-bg`.
 
 ---
