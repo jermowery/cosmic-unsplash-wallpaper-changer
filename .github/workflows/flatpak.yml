@@ -50,7 +50,7 @@ jobs:
             org.freedesktop.Sdk.Extension.rust-stable//25.08
 
       - name: Cache Flatpak builder directory
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             .flatpak-builder
