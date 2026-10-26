@@ -6,8 +6,6 @@
     "sdk-extensions": [
         "org.freedesktop.Sdk.Extension.rust-stable"
     ],
-    "base": "com.system76.Cosmic.BaseApp",
-    "base-version": "stable",
     "command": "cosmic-applet-unsplash",
     "finish-args": [
         "--socket=wayland",
@@ -32,7 +30,7 @@
                 }
             },
             "build-commands": [
-                "if [ -f .cargo/config.toml ]; then cargo build --offline --release; else cargo build --release; fi",
+                "if [ -d vendor ]; then cargo build --offline --release; else cargo build --release; fi",
                 "install -Dm0755 target/release/cosmic-applet-unsplash ${FLATPAK_DEST}/bin/cosmic-applet-unsplash",
                 "install -Dm0644 resources/io.github.cosmic.AppletUnsplash.desktop ${FLATPAK_DEST}/share/applications/io.github.cosmic.AppletUnsplash.desktop",
                 "install -Dm0644 resources/io.github.cosmic.AppletUnsplash.metainfo.xml ${FLATPAK_DEST}/share/metainfo/io.github.cosmic.AppletUnsplash.metainfo.xml",
@@ -44,9 +42,12 @@
                     "type": "dir",
                     "path": "..",
                     "skip": [
+                        ".cargo",
                         ".flatpak-builder",
                         ".git",
+                        ".jj",
                         "builddir",
+                        "pkgconfig",
                         "repo",
                         "target"
                     ]

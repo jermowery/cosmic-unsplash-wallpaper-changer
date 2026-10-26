@@ -19,7 +19,7 @@ Instructions and maintenance guidelines for AI coding agents working in the `cos
 - [`src/unsplash.rs`](src/unsplash.rs): Async Unsplash API client (`build_random_photo_url`, `select_download_url`, `fetch_and_apply_wallpaper`), `download_location` event reporting, and image downloading.
 - [`src/wallpaper.rs`](src/wallpaper.rs): Atomic RON config writer for `~/.config/cosmic/com.system76.CosmicBackground/v1/all` (`set_cosmic_wallpaper`) and cache pruning (`prune_old_wallpapers`).
 - [`build.rs`](build.rs) & [`pkgconfig/`](pkgconfig/): Ensures `libxkbcommon.so` and `xkbcommon.pc` resolve cleanly even on hosts where only the runtime `libxkbcommon.so.0` package is installed.
-- [`flatpak/io.github.cosmic.AppletUnsplash.json`](flatpak/io.github.cosmic.AppletUnsplash.json): Flatpak manifest built on `com.system76.Cosmic.BaseApp//stable` and `org.freedesktop.Platform//25.08`.
+- [`flatpak/io.github.cosmic.AppletUnsplash.json`](flatpak/io.github.cosmic.AppletUnsplash.json): Flatpak manifest built on `org.freedesktop.Platform//25.08`, `org.freedesktop.Sdk//25.08`, and `org.freedesktop.Sdk.Extension.rust-stable//25.08`.
 
 ---
 

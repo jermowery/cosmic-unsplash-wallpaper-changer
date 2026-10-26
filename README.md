@@ -189,19 +189,16 @@ You can trigger a wallpaper fetch and update directly from the command line (and
 
 ## Packaging the Applet for Flatpak
 
-A complete Flatpak manifest is provided at [`flatpak/io.github.cosmic.AppletUnsplash.json`](flatpak/io.github.cosmic.AppletUnsplash.json), built on top of `org.freedesktop.Platform//25.08`, `org.freedesktop.Sdk.Extension.rust-stable//25.08`, and `com.system76.Cosmic.BaseApp//stable`.
+A complete Flatpak manifest is provided at [`flatpak/io.github.cosmic.AppletUnsplash.json`](flatpak/io.github.cosmic.AppletUnsplash.json), built on top of `org.freedesktop.Platform//25.08`, `org.freedesktop.Sdk//25.08`, and `org.freedesktop.Sdk.Extension.rust-stable//25.08`.
 
 ### 1. Install Required Flatpak Runtimes & SDKs
 ```bash
 flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-flatpak remote-add --user --if-not-exists cosmic https://apt.pop-os.org/cosmic/cosmic.flatpakrepo
 
 flatpak install --user flathub \
   org.freedesktop.Platform//25.08 \
   org.freedesktop.Sdk//25.08 \
   org.freedesktop.Sdk.Extension.rust-stable//25.08
-
-flatpak install --user cosmic com.system76.Cosmic.BaseApp//stable
 ```
 
 ### 2. (Optional) Vendor Cargo Dependencies for Offline Flatpak Builds

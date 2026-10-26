@@ -81,8 +81,10 @@ jobs:
           appid = "io.github.cosmic.AppletUnsplash"
           with open(f"flatpak/{appid}.json", "r", encoding="utf-8") as f:
               manifest = json.load(f)
-          assert manifest["id"] == appid, f"Expected {appid}, got {manifest.get(\"id\")}"
-          assert manifest["base"] == "com.system76.Cosmic.BaseApp"
+          actual_id = manifest.get("id")
+          assert actual_id == appid, f"Expected {appid}, got {actual_id}"
+          assert manifest["runtime"] == "org.freedesktop.Platform"
+          assert manifest["sdk"] == "org.freedesktop.Sdk"
           assert manifest["command"] == "cosmic-applet-unsplash"
           print("Flatpak manifest JSON valid.")
           '

@@ -38,19 +38,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y flatpak flatpak-builder ostree
 
-      - name: Configure Flathub and System76 COSMIC Flatpak remotes
+      - name: Configure Flathub remote
         run: |
           flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-          flatpak remote-add --user --if-not-exists cosmic https://apt.pop-os.org/cosmic/cosmic.flatpakrepo
 
-      - name: Install Flatpak SDK, Runtime, and COSMIC BaseApp
+      - name: Install Flatpak SDK, Runtime, and Rust Extension
         run: |
           flatpak install --user --noninteractive flathub \
             org.freedesktop.Platform//25.08 \
             org.freedesktop.Sdk//25.08 \
             org.freedesktop.Sdk.Extension.rust-stable//25.08
-          flatpak install --user --noninteractive cosmic \
-            com.system76.Cosmic.BaseApp//stable
 
       - name: Cache Flatpak builder directory
         uses: actions/cache@v4
