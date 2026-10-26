@@ -42,13 +42,16 @@ Activate and follow these workspace skills when performing related maintenance t
 - Always run `jj status` and `jj diff` to inspect working-copy changes.
 - Use non-interactive flags (`jj describe -m "..."`, `jj commit -m "..."`, `jj new`) — never invoke commands that open an interactive text editor.
 
-### Zero-Warning Policy
-- Every change **must** compile and pass lints with zero warnings across all targets:
+### Zero-Warning Policy & Developer Tooling
+- Every change **must** pass formatting, lints, and tests with zero warnings across all targets (`make check` or `just check`):
   ```bash
-  cargo clippy --all-targets
+  cargo fmt --all -- --check
+  cargo clippy --all-targets -- -D warnings
   cargo test
   cargo build --release
   ```
+- Respect [`rustfmt.toml`](rustfmt.toml), [`clippy.toml`](clippy.toml), [`deny.toml`](deny.toml), and the `[lints]` table in [`Cargo.toml`](Cargo.toml) (`unsafe_code = "forbid"`, `unwrap_used = "warn"`).
+- Pre-commit hooks live in [`.githooks/pre-commit`](.githooks/pre-commit) (enabled via `make setup-hooks`) and [`.pre-commit-config.yaml`](.pre-commit-config.yaml).
 - Keep the `[patch.crates-io]` override for `proc-macro-error2` in [`Cargo.toml`](Cargo.toml) (`patches/proc-macro-error2`) until upstream `libcosmic` / `i18n-embed-fl` updates `proc-macro-error2` past `v2.0.1`.
 - Do **not** pin a `rev = ...` on `[dependencies.libcosmic]` in `Cargo.toml`; `cosmic-panel` depends on `libcosmic` without a `rev`, so `Cargo.lock` alone must pin the exact commit to avoid duplicate `libcosmic` graph nodes during Flatpak cargo vendoring.
 

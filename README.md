@@ -116,6 +116,43 @@ cargo test
 
 ---
 
+## Developer Experience & Tooling
+
+This repository includes standard Rust developer tooling out of the box:
+
+- **Formatter (`rustfmt`)**: Configured in [`rustfmt.toml`](rustfmt.toml) (`max_width = 100`, import & module reordering, shorthand idioms).
+  ```bash
+  make fmt          # or: just fmt / cargo fmt --all
+  make fmt-check    # or: just fmt-check / cargo fmt --all -- --check
+  ```
+- **Linter (`clippy`)**: Configured in [`Cargo.toml`](Cargo.toml) (`[lints.rust]` and `[lints.clippy]`) and [`clippy.toml`](clippy.toml) with `unsafe_code = "forbid"` and zero warnings allowed.
+  ```bash
+  make lint         # or: just lint / cargo clippy --all-targets -- -D warnings
+  ```
+- **All-in-One Quality Gate**: Run formatting check, Clippy lints, and unit tests in a single command:
+  ```bash
+  make check        # or: just check
+  ```
+- **Pre-Commit Hooks**: Both native Git hooks ([`.githooks/pre-commit`](.githooks/pre-commit)) and [`pre-commit`](https://pre-commit.com/) ([`.pre-commit-config.yaml`](.pre-commit-config.yaml)) are included.
+  - To enable the zero-dependency native Git hook (`cargo fmt`, `cargo clippy`, `cargo test`):
+    ```bash
+    make setup-hooks   # or: just setup-hooks
+    ```
+  - Or if you use the `pre-commit` framework:
+    ```bash
+    pre-commit install
+    ```
+- **Dependency & License Auditing (`cargo-deny`)**: Configured in [`deny.toml`](deny.toml) for security advisories, license compliance, crate bans, and allowed registries.
+  ```bash
+  make audit        # or: just audit / cargo deny check
+  ```
+- **Toolchain & Editor Config**:
+  - [`rust-toolchain.toml`](rust-toolchain.toml) pins the `stable` channel with `rustfmt`, `clippy`, `rust-src`, and `rust-analyzer` components.
+  - [`.editorconfig`](.editorconfig) and [`.vscode/`](.vscode/) configure `rust-analyzer` (with `clippy` on save and format-on-save) and recommended extensions.
+  - [`.github/dependabot.yml`](.github/dependabot.yml) keeps Cargo dependencies and GitHub Actions updated weekly.
+
+---
+
 ## Running the Applet
 
 ### 1. Installing & Running in the COSMIC Panel

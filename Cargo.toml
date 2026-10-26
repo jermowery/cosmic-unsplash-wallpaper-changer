@@ -25,6 +25,17 @@ git = "https://github.com/pop-os/libcosmic"
 default-features = false
 features = ["applet", "tokio", "wayland"]
 
+[lints.rust]
+unsafe_code = "forbid"
+non_ascii_idents = "forbid"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"
+unwrap_used = "warn"
+
 [patch.crates-io]
 proc-macro-error2 = { path = "patches/proc-macro-error2" }
 

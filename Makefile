@@ -2,7 +2,7 @@ NAME := cosmic-applet-unsplash
 APPID := io.github.cosmic.AppletUnsplash
 PREFIX ?= $(HOME)/.local
 
-.PHONY: all build release run run-window test install uninstall vendor flatpak-build flatpak-install clean
+.PHONY: all build release run run-window test fmt fmt-check lint check audit setup-hooks install uninstall vendor flatpak-build flatpak-install clean
 
 all: release
 
@@ -20,6 +20,25 @@ run-window:
 
 test:
 	cargo test
+
+fmt:
+	cargo fmt --all
+
+fmt-check:
+	cargo fmt --all -- --check
+
+lint:
+	cargo clippy --all-targets -- -D warnings
+
+check: fmt-check lint test
+
+audit:
+	cargo deny check
+
+setup-hooks:
+	chmod +x .githooks/pre-commit
+	git config core.hooksPath .githooks
+	@echo "Git pre-commit hooks enabled (.githooks/pre-commit)"
 
 install: release
 	install -Dm0755 target/release/$(NAME) $(PREFIX)/bin/$(NAME)

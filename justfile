@@ -35,6 +35,25 @@ run-window:
 test *args:
     cargo test {{args}}
 
+fmt:
+    cargo fmt --all
+
+fmt-check:
+    cargo fmt --all -- --check
+
+lint:
+    cargo clippy --all-targets -- -D warnings
+
+check: fmt-check lint test
+
+audit:
+    cargo deny check
+
+setup-hooks:
+    chmod +x .githooks/pre-commit
+    git config core.hooksPath .githooks
+    @echo "Git pre-commit hooks enabled (.githooks/pre-commit)"
+
 install:
     install -Dm0755 {{bin-src}} {{bin-dst}}
     install -Dm0644 {{desktop-src}} {{desktop-dst}}

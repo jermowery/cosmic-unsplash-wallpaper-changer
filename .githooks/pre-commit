@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Native Git pre-commit hook for cosmic-applet-unsplash
+# Enabled via: git config core.hooksPath .githooks (or `make setup-hooks` / `just setup-hooks`)
+
+set -euo pipefail
+
+echo "==> [pre-commit] Checking Rust formatting (cargo fmt)..."
+cargo fmt --all -- --check
+
+echo "==> [pre-commit] Running Clippy linter (cargo clippy)..."
+cargo clippy --all-targets -- -D warnings
+
+echo "==> [pre-commit] Running unit tests (cargo test)..."
+cargo test --quiet
+
+echo "==> [pre-commit] All checks passed!"
