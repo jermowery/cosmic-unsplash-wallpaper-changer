@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check-and-test:
+    name: Format, Lint, Test & Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            pkg-config \
+            libxkbcommon-dev \
+            libwayland-dev
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo registry and build artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting (cargo fmt)
+        run: cargo fmt --all -- --check
+
+      - name: Run Clippy lints (zero warnings)
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Run unit tests
+        run: cargo test --verbose
+
+      - name: Build release binary
+        run: cargo build --release --verbose
+
+  validate-metadata:
+    name: Validate Desktop, AppStream & Flatpak Metadata
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install desktop and AppStream validators
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y desktop-file-utils appstream python3
+
+      - name: Validate .desktop entry
+        run: |
+          APPID="io.github.cosmic.AppletUnsplash"
+          output="$(desktop-file-validate "resources/${APPID}.desktop" || true)"
+          filtered="$(printf '%s\n' "${output}" \
+            | grep -v 'unregistered value "COSMIC"' \
+            | grep -v 'does not contain a registered main category' \
+            | grep -v '^$' || true)"
+          if [ -n "${filtered}" ]; then
+            printf '%s\n' "${filtered}"
+            exit 1
+          fi
+          echo "Desktop entry valid."
+
+      - name: Validate Flatpak manifest JSON
+        run: |
+          python3 -c '
+          import json
+          appid = "io.github.cosmic.AppletUnsplash"
+          with open(f"flatpak/{appid}.json", "r", encoding="utf-8") as f:
+              manifest = json.load(f)
+          assert manifest["id"] == appid, f"Expected {appid}, got {manifest.get(\"id\")}"
+          assert manifest["base"] == "com.system76.Cosmic.BaseApp"
+          assert manifest["command"] == "cosmic-applet-unsplash"
+          print("Flatpak manifest JSON valid.")
+          '

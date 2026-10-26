@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.cosmic.AppletUnsplash</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-only</project_license>
+  <name>Unsplash Wallpaper Applet</name>
+  <summary>Fetch and configure desktop wallpapers from Unsplash for the COSMIC desktop</summary>
+  <description>
+    <p>
+      A panel applet for the System76 COSMIC desktop environment that fetches high-resolution
+      wallpapers from the Unsplash API and applies them directly to cosmic-bg.
+    </p>
+    <p>
+      Features include configurable Unsplash API credentials, search queries, topic and collection
+      filters, photographer filtering, orientation and safety filters, resolution selection,
+      scaling modes, and automatic rotation intervals.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.cosmic.AppletUnsplash.desktop</launchable>
+  <icon type="stock">io.github.cosmic.AppletUnsplash-symbolic</icon>
+  <categories>
+    <category>COSMIC</category>
+    <category>Utility</category>
+  </categories>
+</component>
