@@ -61,6 +61,18 @@ A native panel applet for the **System76 COSMIC Desktop Environment** (`libcosmi
 
 ---
 
+## Getting an Unsplash API Key (Required)
+
+This applet does not bundle a shared API key — **you must provide your own Unsplash API Access Key**. Creating a developer account and registering an application on Unsplash is free:
+
+1. Read the official Unsplash guide on [**Creating a Developer Account & Registering Your Application**](https://unsplash.com/documentation#creating-a-developer-account).
+2. Go to the [**Unsplash Developers Applications Portal**](https://unsplash.com/oauth/applications) and click **New Application**.
+3. Accept the API Use and Guidelines terms and give your application a name (e.g., `COSMIC Wallpaper Applet`).
+4. Scroll down to the **Keys** section of your application page and copy the **Access Key** *(you do not need the Application ID or Secret Key)*.
+5. Paste the **Access Key** into the applet's **Unsplash API Key** field in the panel popup dialog (or pass `--access-key "<YOUR_ACCESS_KEY>"` / set `UNSPLASH_ACCESS_KEY` in your environment).
+
+---
+
 ## Prerequisites
 
 - **Rust Toolchain**: `rustc` and `cargo` (Rust 1.80+ recommended)
