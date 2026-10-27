@@ -5,6 +5,10 @@
 
 A native panel applet for the **System76 COSMIC Desktop Environment** (`libcosmic`) that downloads photos from [Unsplash](https://unsplash.com) and sets them as your COSMIC desktop wallpaper via `cosmic-bg`.
 
+<p align="center">
+  <img src="resources/screenshot.png" alt="Random Wallpaper Applet for COSMIC Desktop" width="400">
+</p>
+
 ---
 
 ## How It Works & Codebase Architecture
@@ -14,7 +18,7 @@ A native panel applet for the **System76 COSMIC Desktop Environment** (`libcosmi
 ### End-to-End Flow
 
 1. **Panel Integration**: `cosmic-panel` discovers `io.github.jermowery.CosmicExtAppletRandomWallpaper.desktop` (`X-CosmicApplet=true`) and launches `cosmic-ext-applet-random-wallpaper` as an embedded Wayland panel button.
-2. **Configuration Popup**: Clicking the panel icon toggles a Wayland `xdg_popup` dialog (`src/window.rs`) where you configure your Unsplash API Access Key, search filters, target resolution, wallpaper scaling mode, and auto-refresh timer. Middle-clicking the panel icon triggers an immediate wallpaper refresh without opening the popup.
+2. **Configuration Popup**: Clicking the panel icon toggles a Wayland `xdg_popup` dialog (`src/app.rs`) where you configure your Unsplash API Access Key, search filters, target resolution, wallpaper scaling mode, and auto-refresh timer. Middle-clicking the panel icon triggers an immediate wallpaper refresh without opening the popup.
 3. **Settings Persistence**: Settings are persisted in RON format via `cosmic-config` at `~/.config/cosmic/io.github.jermowery.CosmicExtAppletRandomWallpaper/v1/settings` (`src/config.rs`), with automatic host-path resolution when running inside a Flatpak sandbox.
 4. **Unsplash API Client**: When a wallpaper update is triggered (manually, via CLI, or by the auto-refresh timer), `src/unsplash.rs` queries `GET https://api.unsplash.com/photos/random` with `Authorization: Client-ID <ACCESS_KEY>` and all configured query parameters (`query`, `topics`, `collections`, `username`, `orientation`, `content_filter`, `featured`). It also fires a best-effort request to the photo's `links.download_location` endpoint in compliance with Unsplash API guidelines, then downloads the image at the selected resolution (`Full`, `4K UHD`, `1440p QHD`, `1080p`, or `Raw`).
 5. **Applying the Wallpaper (`cosmic-bg`)**: The downloaded image is saved with a unique timestamped filename (`unsplash-<photo_id>-<timestamp>.jpg`) in `~/.config/cosmic/com.system76.CosmicBackground/unsplash/`. `src/wallpaper.rs` atomically updates `~/.config/cosmic/com.system76.CosmicBackground/v1/all` (and `same-on-all`) with the new `Path(...)` and `ScalingMode`. `cosmic-bg`'s file watcher (`inotify`) immediately detects the change and renders the new wallpaper across your display(s). Older cached images beyond the 10 most recent downloads are automatically pruned.
@@ -23,21 +27,28 @@ A native panel applet for the **System76 COSMIC Desktop Environment** (`libcosmi
 
 ```text
 .
-├── Cargo.toml                  # Crate metadata, dependencies (libcosmic, reqwest, tokio, ron, serde)
+├── Cargo.toml                  # Crate metadata, dependencies (libcosmic, reqwest, tokio, ron, serde, i18n)
 ├── build.rs                    # Build script ensuring libxkbcommon.so linker discovery
 ├── Makefile / justfile         # Build, install, vendor, and Flatpak packaging recipes
+├── i18n.toml                   # Fluent localization configuration
 ├── LICENSE                     # GNU General Public License v3.0 (GPL-3.0-only)
 ├── flatpak/
-│   └── io.github.jermowery.CosmicExtAppletRandomWallpaper.json   # Flatpak manifest (Cosmic.BaseApp + freedesktop 25.08)
+│   ├── io.github.jermowery.CosmicExtAppletRandomWallpaper.json # Flatpak manifest
+│   └── cargo-sources.json      # Offline cargo dependencies for Flatpak
+├── i18n/
+│   └── en/
+│       └── cosmic_ext_applet_random_wallpaper.ftl # English Fluent translations
 ├── resources/
 │   ├── io.github.jermowery.CosmicExtAppletRandomWallpaper.desktop      # COSMIC panel applet desktop entry
 │   ├── io.github.jermowery.CosmicExtAppletRandomWallpaper.metainfo.xml # AppStream metadata
-│   └── icons/hicolor/scalable/apps/                 # Full-color and symbolic SVG panel icons
+│   ├── screenshot.png                          # Applet configuration screenshot
+│   └── icons/hicolor/scalable/apps/            # Full-color and symbolic SVG panel icons
 └── src/
     ├── main.rs                 # Entry point supporting panel applet mode, --window mode, and CLI --fetch-now
+    ├── app.rs                  # libcosmic Application implementation, panel icon, popup UI, and subscriptions
+    ├── config.rs               # Config data model (CosmicConfigEntry) and cosmic-config persistence
+    ├── i18n.rs                 # Fluent localization loader and fl!() macro
     ├── error.rs                # Structured AppError enum (thiserror) for domain error handling
-    ├── window.rs               # libcosmic Application implementation, panel icon, popup UI, and timer subscription
-    ├── config.rs               # UnsplashSettings data model and cosmic-config RON persistence
     ├── unsplash.rs             # Async Unsplash REST API client, URL builder, and image downloader
     └── wallpaper.rs            # Atomic RON writer for com.system76.CosmicBackground and cache pruning
 ```
