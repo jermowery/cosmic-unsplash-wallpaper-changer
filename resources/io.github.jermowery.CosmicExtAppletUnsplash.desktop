@@ -1,12 +1,12 @@
 [Desktop Entry]
 Name=Unsplash Wallpaper
-Comment=Fetch and set COSMIC desktop wallpapers from Unsplash
+Comment=Fetch and set wallpapers from Unsplash for the COSMIC™ desktop
 Type=Application
-Exec=cosmic-applet-unsplash
+Exec=cosmic-ext-applet-unsplash
 Terminal=false
 Categories=Utility;X-COSMIC;
 Keywords=COSMIC;Applet;Wallpaper;Unsplash;Background;
-Icon=io.github.cosmic.AppletUnsplash-symbolic
+Icon=io.github.jermowery.CosmicExtAppletUnsplash-symbolic
 StartupNotify=true
 NoDisplay=true
 X-CosmicApplet=true

@@ -9,7 +9,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::AppError;
 
-pub const APP_ID: &str = "io.github.cosmic.AppletUnsplash";
+pub const APP_ID: &str = "io.github.jermowery.CosmicExtAppletUnsplash";
+const LEGACY_APP_ID: &str = "io.github.cosmic.AppletUnsplash";
 pub const CONFIG_VERSION: u64 = 1;
 pub const SETTINGS_KEY: &str = "settings";
 
@@ -301,7 +302,27 @@ impl SettingsStore {
                 return settings;
             }
         }
+        // Migrate settings from the legacy App ID if present.
+        if let Some(legacy_settings) = Self::load_legacy() {
+            let _ = self.save(&legacy_settings);
+            return legacy_settings;
+        }
         UnsplashSettings::default()
+    }
+
+    fn load_legacy() -> Option<UnsplashSettings> {
+        if let Ok(legacy_cfg) = Config::new(LEGACY_APP_ID, CONFIG_VERSION) {
+            if let Ok(settings) = legacy_cfg.get_local::<UnsplashSettings>(SETTINGS_KEY) {
+                return Some(settings);
+            }
+        }
+        let legacy_path = host_config_dir()
+            .join("cosmic")
+            .join(LEGACY_APP_ID)
+            .join(format!("v{CONFIG_VERSION}"))
+            .join(SETTINGS_KEY);
+        let contents = fs::read_to_string(legacy_path).ok()?;
+        ron::from_str::<UnsplashSettings>(&contents).ok()
     }
 
     /// Persists `settings` to `cosmic-config` (or the RON fallback file).

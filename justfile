@@ -1,5 +1,5 @@
-name := 'cosmic-applet-unsplash'
-appid := 'io.github.cosmic.AppletUnsplash'
+name := 'cosmic-ext-applet-unsplash'
+appid := 'io.github.jermowery.CosmicExtAppletUnsplash'
 
 rootdir := ''
 prefix := '/usr'

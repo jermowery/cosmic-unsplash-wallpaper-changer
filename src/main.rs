@@ -12,15 +12,15 @@ use crate::unsplash::fetch_and_apply_wallpaper;
 use crate::window::UnsplashApplet;
 
 const HELP_TEXT: &str = "\
-cosmic-applet-unsplash — COSMIC Desktop Panel Applet for Unsplash Wallpapers
+cosmic-ext-applet-unsplash — Unsplash Wallpaper Applet for the COSMIC™ Desktop
 
 USAGE:
-    cosmic-applet-unsplash [OPTIONS]
+    cosmic-ext-applet-unsplash [OPTIONS]
 
 OPTIONS:
-    (no flags)                  Run as a COSMIC panel applet
+    (no flags)                  Run as a panel applet for the COSMIC™ desktop
     -w, --window                Open the settings dialog in a standalone desktop window
-    --fetch-now                 Fetch a random Unsplash photo and set the COSMIC wallpaper immediately
+    --fetch-now                 Fetch a random Unsplash photo and set the desktop wallpaper immediately
     --save                      Persist any CLI-supplied settings to cosmic-config
     --access-key <KEY>          Unsplash API Access Key (Client-ID)
     --query <TERMS>             Search terms (e.g. \"mountains, nature\")

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Native Git pre-commit hook for cosmic-applet-unsplash
+# Native Git pre-commit hook for cosmic-ext-applet-unsplash
 # Enabled via: git config core.hooksPath .githooks (or `make setup-hooks` / `just setup-hooks`)
 
 set -euo pipefail

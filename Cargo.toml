@@ -1,9 +1,9 @@
 [package]
-name = "cosmic-applet-unsplash"
+name = "cosmic-ext-applet-unsplash"
 version = "0.1.0"
 edition = "2021"
 license = "GPL-3.0-only"
-description = "A COSMIC desktop panel applet that fetches and sets wallpapers from Unsplash."
+description = "A panel applet for the COSMIC™ desktop that fetches and sets wallpapers from Unsplash."
 repository = "https://github.com/jermowery/cosmic-unsplash-wallpaper-changer"
 
 [dependencies]
@@ -40,7 +40,4 @@ unimplemented = "warn"
 unwrap_used = "warn"
 module_name_repetitions = "allow"
 must_use_candidate = "allow"
-
-[patch.crates-io]
-proc-macro-error2 = { path = "patches/proc-macro-error2" }
 

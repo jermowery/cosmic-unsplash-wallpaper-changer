@@ -10,7 +10,7 @@ use crate::error::AppError;
 use crate::wallpaper::{prune_old_wallpapers, set_cosmic_wallpaper, wallpaper_storage_dir};
 
 const UNSPLASH_RANDOM_ENDPOINT: &str = "https://api.unsplash.com/photos/random";
-const USER_AGENT_VALUE: &str = concat!("cosmic-applet-unsplash/", env!("CARGO_PKG_VERSION"));
+const USER_AGENT_VALUE: &str = concat!("cosmic-ext-applet-unsplash/", env!("CARGO_PKG_VERSION"));
 const MAX_CACHED_WALLPAPERS: usize = 10;
 
 #[derive(Debug, Deserialize)]

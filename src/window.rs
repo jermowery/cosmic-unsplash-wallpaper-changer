@@ -18,7 +18,7 @@ use crate::config::{
 use crate::unsplash::fetch_and_apply_wallpaper;
 use crate::wallpaper::set_cosmic_wallpaper;
 
-const ICON_SYMBOLIC: &str = "io.github.cosmic.AppletUnsplash-symbolic";
+const ICON_SYMBOLIC: &str = "io.github.jermowery.CosmicExtAppletUnsplash-symbolic";
 
 pub struct UnsplashApplet {
     core: Core,
@@ -476,7 +476,7 @@ impl UnsplashApplet {
             .push(
                 Column::new()
                     .push(text::title4("Unsplash Wallpaper"))
-                    .push(text::caption("COSMIC Desktop Wallpaper Applet"))
+                    .push(text::caption("Wallpaper Applet for the COSMIC™ Desktop"))
                     .width(Length::Fill),
             )
             .push(fetch_btn)

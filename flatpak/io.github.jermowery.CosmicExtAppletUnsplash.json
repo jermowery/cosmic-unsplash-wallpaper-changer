@@ -1,12 +1,12 @@
 {
-    "id": "io.github.cosmic.AppletUnsplash",
+    "id": "io.github.jermowery.CosmicExtAppletUnsplash",
     "runtime": "org.freedesktop.Platform",
     "runtime-version": "25.08",
     "sdk": "org.freedesktop.Sdk",
     "sdk-extensions": [
         "org.freedesktop.Sdk.Extension.rust-stable"
     ],
-    "command": "cosmic-applet-unsplash",
+    "command": "cosmic-ext-applet-unsplash",
     "finish-args": [
         "--socket=wayland",
         "--socket=fallback-x11",
@@ -18,7 +18,7 @@
     ],
     "modules": [
         {
-            "name": "cosmic-applet-unsplash",
+            "name": "cosmic-ext-applet-unsplash",
             "buildsystem": "simple",
             "build-options": {
                 "append-path": "/usr/lib/sdk/rust-stable/bin",
@@ -26,16 +26,16 @@
                     "--share=network"
                 ],
                 "env": {
-                    "CARGO_HOME": "/run/build/cosmic-applet-unsplash/cargo"
+                    "CARGO_HOME": "/run/build/cosmic-ext-applet-unsplash/cargo"
                 }
             },
             "build-commands": [
                 "if [ -d vendor ]; then cargo build --offline --release; else cargo build --release; fi",
-                "install -Dm0755 target/release/cosmic-applet-unsplash ${FLATPAK_DEST}/bin/cosmic-applet-unsplash",
-                "install -Dm0644 resources/io.github.cosmic.AppletUnsplash.desktop ${FLATPAK_DEST}/share/applications/io.github.cosmic.AppletUnsplash.desktop",
-                "install -Dm0644 resources/io.github.cosmic.AppletUnsplash.metainfo.xml ${FLATPAK_DEST}/share/metainfo/io.github.cosmic.AppletUnsplash.metainfo.xml",
-                "install -Dm0644 resources/icons/hicolor/scalable/apps/io.github.cosmic.AppletUnsplash.svg ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/io.github.cosmic.AppletUnsplash.svg",
-                "install -Dm0644 resources/icons/hicolor/scalable/apps/io.github.cosmic.AppletUnsplash-symbolic.svg ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/io.github.cosmic.AppletUnsplash-symbolic.svg"
+                "install -Dm0755 target/release/cosmic-ext-applet-unsplash ${FLATPAK_DEST}/bin/cosmic-ext-applet-unsplash",
+                "install -Dm0644 resources/io.github.jermowery.CosmicExtAppletUnsplash.desktop ${FLATPAK_DEST}/share/applications/io.github.jermowery.CosmicExtAppletUnsplash.desktop",
+                "install -Dm0644 resources/io.github.jermowery.CosmicExtAppletUnsplash.metainfo.xml ${FLATPAK_DEST}/share/metainfo/io.github.jermowery.CosmicExtAppletUnsplash.metainfo.xml",
+                "install -Dm0644 resources/icons/hicolor/scalable/apps/io.github.jermowery.CosmicExtAppletUnsplash.svg ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/io.github.jermowery.CosmicExtAppletUnsplash.svg",
+                "install -Dm0644 resources/icons/hicolor/scalable/apps/io.github.jermowery.CosmicExtAppletUnsplash-symbolic.svg ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/io.github.jermowery.CosmicExtAppletUnsplash-symbolic.svg"
             ],
             "sources": [
                 {
