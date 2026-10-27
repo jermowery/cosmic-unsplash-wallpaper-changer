@@ -1,15 +1,18 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
+mod app;
 mod config;
 mod error;
+mod i18n;
 mod unsplash;
 mod wallpaper;
-mod window;
 
 use std::process::ExitCode;
 
-use crate::config::{ContentFilter, Orientation, SettingsStore, UnsplashSettings};
+use crate::app::AppModel;
+use crate::config::{Config, ContentFilter, Orientation, SettingsStore};
 use crate::error::AppError;
 use crate::unsplash::fetch_and_apply_wallpaper;
-use crate::window::UnsplashApplet;
 
 const HELP_TEXT: &str = "\
 cosmic-ext-applet-random-wallpaper — Random Wallpaper Applet for the COSMIC™ Desktop
@@ -55,7 +58,7 @@ where
         .ok_or_else(|| AppError::CliUsage(format!("Missing value for '{flag}'")))
 }
 
-fn apply_cli_args<I>(args: I, settings: &mut UnsplashSettings) -> Result<CliOptions, AppError>
+fn apply_cli_args<I>(args: I, settings: &mut Config) -> Result<CliOptions, AppError>
 where
     I: IntoIterator<Item = String>,
 {
@@ -106,7 +109,7 @@ where
     Ok(opts)
 }
 
-fn run_cli_fetch(store: &SettingsStore, mut settings: UnsplashSettings) -> Result<(), AppError> {
+fn run_cli_fetch(store: &SettingsStore, mut settings: Config) -> Result<(), AppError> {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -128,6 +131,10 @@ fn run_cli_fetch(store: &SettingsStore, mut settings: UnsplashSettings) -> Resul
 }
 
 fn main() -> ExitCode {
+    // Get the system's preferred languages and enable localizations.
+    let requested_languages = i18n_embed::DesktopLanguageRequester::requested_languages();
+    i18n::init(&requested_languages);
+
     let store = SettingsStore::new();
     let mut settings = store.load();
 
@@ -165,14 +172,14 @@ fn main() -> ExitCode {
         ExecutionMode::StandaloneWindow => {
             let win_settings =
                 cosmic::app::Settings::default().size(cosmic::iced::Size::new(460.0, 720.0));
-            if let Err(err) = cosmic::app::run::<UnsplashApplet>(win_settings, true) {
+            if let Err(err) = cosmic::app::run::<AppModel>(win_settings, true) {
                 eprintln!("Application error: {err}");
                 return ExitCode::FAILURE;
             }
             ExitCode::SUCCESS
         }
         ExecutionMode::PanelApplet => {
-            if let Err(err) = cosmic::applet::run::<UnsplashApplet>(false) {
+            if let Err(err) = cosmic::applet::run::<AppModel>(false) {
                 eprintln!("Application error: {err}");
                 return ExitCode::FAILURE;
             }
@@ -305,5 +312,12 @@ mod tests {
 
         let unknown_flag = ["--not-a-flag"].into_iter().map(String::from);
         assert!(apply_cli_args(unknown_flag, &mut settings).is_err());
+    }
+
+    #[test]
+    fn fluent_localizations_load_and_format_expected_strings() {
+        crate::i18n::init(&[]);
+        assert_eq!(crate::fl!("app-title"), "Random Wallpaper");
+        assert!(crate::fl!("app-comment").contains("COSMIC"));
     }
 }

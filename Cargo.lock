@@ -947,9 +947,12 @@ name = "cosmic-ext-applet-random-wallpaper"
 version = "0.1.0"
 dependencies = [
  "dirs",
+ "i18n-embed",
+ "i18n-embed-fl",
  "libcosmic",
  "reqwest",
  "ron",
+ "rust-embed",
  "serde",
  "serde_json",
  "tempfile",

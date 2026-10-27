@@ -11,12 +11,13 @@ Instructions and maintenance guidelines for AI coding agents working in the `cos
 ### Key Modules
 
 - [`src/main.rs`](src/main.rs): Application entry point supporting three execution modes:
-  1. Default panel applet mode (`cosmic::applet::run::<UnsplashApplet>(false)`)
+  1. Default panel applet mode (`cosmic::applet::run::<app::AppModel>(false)`)
   2. Standalone desktop window mode (`--window` / `-w`)
   3. Headless CLI one-shot mode (`--fetch-now`, `--save`, `--access-key`, `--query`, etc.)
+- [`src/app.rs`](src/app.rs): `cosmic::Application` state machine (`AppModel`), panel symbolic icon button, Wayland popup dialog layout, config watcher, and `Subscription` timer for automatic wallpaper rotation.
+- [`src/config.rs`](src/config.rs): `Config` (`CosmicConfigEntry`, aliased as `UnsplashSettings`) data structures and `SettingsStore` persistence backed by `cosmic-config` (`~/.config/cosmic/io.github.jermowery.CosmicExtAppletRandomWallpaper/v1/settings`).
+- [`src/i18n.rs`](src/i18n.rs) & [`i18n/`](i18n/): Fluent localization (`i18n-embed` / `fl!()` macro) matching `pop-os/cosmic-applet-template`.
 - [`src/error.rs`](src/error.rs): Structured `AppError` enum (`thiserror`) covering HTTP, JSON, RON, I/O, and CLI validation errors.
-- [`src/window.rs`](src/window.rs): `cosmic::Application` state machine, panel symbolic icon button, Wayland popup dialog layout, and `Subscription` timer for automatic wallpaper rotation.
-- [`src/config.rs`](src/config.rs): `UnsplashSettings` data structures and `SettingsStore` persistence backed by `cosmic-config` (`~/.config/cosmic/io.github.jermowery.CosmicExtAppletRandomWallpaper/v1/settings`).
 - [`src/unsplash.rs`](src/unsplash.rs): Async Unsplash API client (`build_random_photo_url`, `select_download_url`, `fetch_and_apply_wallpaper`), `download_location` event reporting, and image downloading.
 - [`src/wallpaper.rs`](src/wallpaper.rs): Atomic RON config writer for `~/.config/cosmic/com.system76.CosmicBackground/v1/all` (`set_cosmic_wallpaper`) and cache pruning (`prune_old_wallpapers`).
 - [`build.rs`](build.rs) & [`pkgconfig/`](pkgconfig/): Ensures `libxkbcommon.so` and `xkbcommon.pc` resolve cleanly even on hosts where only the runtime `libxkbcommon.so.0` package is installed.
@@ -59,7 +60,7 @@ Activate and follow these workspace skills when performing related maintenance t
 - **Always install `--release` binaries**: `libcosmic` applets use `iced_tiny_skia` (CPU rendering) and `cosmic-text` (font shaping). Debug builds (`opt-level = 0`) cause severe scrolling and typing lag. Always use `make install` (which builds `--release`) when installing to `~/.local/bin/cosmic-ext-applet-random-wallpaper`.
 - **No disk I/O on keystrokes**: Never call `self.persist_quietly()` or `store.save()` inside `TextInput::on_input` handlers (`Message::AccessKeyChanged`, `Message::QueryChanged`, `Message::TopicsChanged`, `Message::CollectionsChanged`, `Message::UsernameChanged`). Only persist settings on button clicks (`SaveSettings`, `FetchNow`, enum selectors), popup close (`PopupClosed`, `TogglePopup`), or CLI `--save`.
 
-### Wayland Popup Layout Invariants (`src/window.rs`)
+### Wayland Popup Layout Invariants (`src/app.rs`)
 - Pass `size: None` to `self.core.applet.get_popup_settings(...)` so `popup_container` manages sizing.
 - Keep `status_col` (`Length::Shrink`) and `form_body` (`scrollable` with `Length::Fill`) inside the fixed-height `middle_section` (`Length::Fixed(420.0)` in popup mode, `Length::Fill` in standalone window mode). This guarantees that when multi-line error or status text is added dynamically while the popup is open, `form_body` shrinks by that exact height and the bottom footer buttons are never pushed off the popup surface.
 - Maintain internal padding (`.padding([space_s, space_m, space_s, space_s])`) on the `Column` inside `scrollable` so text inputs and option buttons do not collide with the scrollbar or viewport edges.

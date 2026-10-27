@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 use std::time::Duration;
 
 use cosmic::app::Core;
@@ -12,18 +14,25 @@ use cosmic::widget::{
 use cosmic::Element;
 
 use crate::config::{
-    ContentFilter, ImageResolution, LastPhotoInfo, Orientation, SettingsStore, UnsplashSettings,
+    Config, ContentFilter, ImageResolution, LastPhotoInfo, Orientation, SettingsStore,
     WallpaperScalingMode, APP_ID,
 };
+use crate::fl;
 use crate::unsplash::fetch_and_apply_wallpaper;
 use crate::wallpaper::set_cosmic_wallpaper;
 
 const ICON_SYMBOLIC: &str = "io.github.jermowery.CosmicExtAppletRandomWallpaper-symbolic";
 
-pub struct UnsplashApplet {
+/// The application model stores app-specific state used to describe its interface and
+/// drive its logic.
+pub struct AppModel {
+    /// Application state which is managed by the COSMIC runtime.
     core: Core,
+    /// Persistent configuration store backed by `cosmic-config`.
     store: SettingsStore,
-    settings: UnsplashSettings,
+    /// Configuration data that persists between application runs.
+    config: Config,
+    /// The popup id.
     popup: Option<Id>,
     standalone_window: bool,
     hide_access_key: bool,
@@ -32,10 +41,12 @@ pub struct UnsplashApplet {
     error_message: Option<String>,
 }
 
+/// Messages emitted by the application and its widgets.
 #[derive(Clone, Debug)]
 pub enum Message {
     TogglePopup,
     PopupClosed(Id),
+    UpdateConfig(Config),
     AccessKeyChanged(String),
     ToggleAccessKeyVisibility,
     QueryChanged(String),
@@ -54,10 +65,18 @@ pub enum Message {
     AutoRefreshTick,
 }
 
-impl cosmic::Application for UnsplashApplet {
+/// Create a COSMIC application from the app model
+impl cosmic::Application for AppModel {
+    /// The async executor that will be used to run your application's commands.
     type Executor = cosmic::SingleThreadExecutor;
+
+    /// Data that your application receives to its init method.
     type Flags = bool;
+
+    /// Messages which the application and its widgets will emit.
     type Message = Message;
+
+    /// Unique identifier in RDNN (reverse domain name notation) format.
     const APP_ID: &'static str = APP_ID;
 
     fn core(&self) -> &Core {
@@ -68,16 +87,17 @@ impl cosmic::Application for UnsplashApplet {
         &mut self.core
     }
 
+    /// Initializes the application with any given flags and startup commands.
     fn init(
         core: Core,
         standalone_window: Self::Flags,
     ) -> (Self, Task<cosmic::Action<Self::Message>>) {
         let store = SettingsStore::new();
-        let settings = store.load();
+        let config = store.load();
         let app = Self {
             core,
             store,
-            settings,
+            config,
             popup: None,
             standalone_window,
             hide_access_key: true,
@@ -92,6 +112,7 @@ impl cosmic::Application for UnsplashApplet {
         Some(Message::PopupClosed(id))
     }
 
+    /// Handles messages emitted by the application and its widgets.
     fn update(&mut self, message: Self::Message) -> Task<cosmic::Action<Self::Message>> {
         match message {
             Message::PopupClosed(id) => {
@@ -103,56 +124,66 @@ impl cosmic::Application for UnsplashApplet {
             Message::TogglePopup => {
                 return self.handle_toggle_popup();
             }
+            Message::UpdateConfig(config) => {
+                // Only apply external config updates when the popup is closed and the incoming
+                // config is non-empty so active typing in the popup is never overwritten.
+                if self.popup.is_none()
+                    && !self.standalone_window
+                    && (!config.access_key.is_empty() || !config.query.is_empty())
+                {
+                    self.config = config;
+                }
+            }
             Message::AccessKeyChanged(val) => {
-                self.settings.access_key = val;
+                self.config.access_key = val;
             }
             Message::ToggleAccessKeyVisibility => {
                 self.hide_access_key = !self.hide_access_key;
             }
             Message::QueryChanged(val) => {
-                self.settings.query = val;
+                self.config.query = val;
             }
             Message::TopicsChanged(val) => {
-                self.settings.topics = val;
+                self.config.topics = val;
             }
             Message::CollectionsChanged(val) => {
-                self.settings.collections = val;
+                self.config.collections = val;
             }
             Message::UsernameChanged(val) => {
-                self.settings.username = val;
+                self.config.username = val;
             }
             Message::OrientationSelected(orientation) => {
-                self.settings.orientation = orientation;
+                self.config.orientation = orientation;
                 self.persist_quietly();
             }
             Message::ContentFilterSelected(filter) => {
-                self.settings.content_filter = filter;
+                self.config.content_filter = filter;
                 self.persist_quietly();
             }
             Message::FeaturedToggled(featured) => {
-                self.settings.featured = featured;
+                self.config.featured = featured;
                 self.persist_quietly();
             }
             Message::ResolutionSelected(res) => {
-                self.settings.resolution = res;
+                self.config.resolution = res;
                 self.persist_quietly();
             }
             Message::ScalingModeSelected(mode) => {
-                self.settings.scaling_mode = mode;
+                self.config.scaling_mode = mode;
                 self.persist_quietly();
-                if let Some(last) = &self.settings.last_photo {
+                if let Some(last) = &self.config.last_photo {
                     if last.file_path.exists() {
                         let _ = set_cosmic_wallpaper(&last.file_path, mode);
                     }
                 }
             }
             Message::AutoRefreshSelected(minutes) => {
-                self.settings.auto_refresh_minutes = minutes;
+                self.config.auto_refresh_minutes = minutes;
                 self.persist_quietly();
             }
-            Message::SaveSettings => match self.store.save(&self.settings) {
+            Message::SaveSettings => match self.store.save(&self.config) {
                 Ok(()) => {
-                    self.status_message = Some("Settings saved.".to_string());
+                    self.status_message = Some(fl!("settings-saved"));
                     self.error_message = None;
                 }
                 Err(err) => {
@@ -169,16 +200,26 @@ impl cosmic::Application for UnsplashApplet {
         Task::none()
     }
 
+    /// Register subscriptions for this application.
     fn subscription(&self) -> Subscription<Self::Message> {
-        let minutes = self.settings.auto_refresh_minutes;
+        let mut subscriptions = vec![self
+            .core()
+            .watch_config::<Config>(Self::APP_ID)
+            .map(|update| Message::UpdateConfig(update.config))];
+
+        let minutes = self.config.auto_refresh_minutes;
         if minutes > 0 {
             let secs = u64::from(minutes).saturating_mul(60).max(60);
-            cosmic::iced::time::every(Duration::from_secs(secs)).map(|_| Message::AutoRefreshTick)
-        } else {
-            Subscription::none()
+            subscriptions.push(
+                cosmic::iced::time::every(Duration::from_secs(secs))
+                    .map(|_| Message::AutoRefreshTick),
+            );
         }
+
+        Subscription::batch(subscriptions)
     }
 
+    /// Describes the interface based on the current state of the application model.
     fn view(&self) -> Element<'_, Self::Message> {
         if self.standalone_window {
             return container(self.dialog_content())
@@ -198,6 +239,7 @@ impl cosmic::Application for UnsplashApplet {
         .into()
     }
 
+    /// The applet's popup window will be drawn using this view method.
     fn view_window(&self, _id: Id) -> Element<'_, Self::Message> {
         self.core
             .applet
@@ -221,9 +263,9 @@ impl cosmic::Application for UnsplashApplet {
     }
 }
 
-impl UnsplashApplet {
+impl AppModel {
     fn persist_quietly(&mut self) {
-        if let Err(err) = self.store.save(&self.settings) {
+        if let Err(err) = self.store.save(&self.config) {
             self.error_message = Some(format!("Could not save settings: {err}"));
         }
     }
@@ -255,11 +297,11 @@ impl UnsplashApplet {
         if self.is_fetching {
             return Task::none();
         }
-        let _ = self.store.save(&self.settings);
+        let _ = self.store.save(&self.config);
         self.is_fetching = true;
         self.error_message = None;
-        self.status_message = Some("Fetching wallpaper from Unsplash...".to_string());
-        let current_settings = self.settings.clone();
+        self.status_message = Some(fl!("fetching-status"));
+        let current_settings = self.config.clone();
         cosmic::task::future(async move {
             let result = fetch_and_apply_wallpaper(&current_settings)
                 .await
@@ -277,8 +319,8 @@ impl UnsplashApplet {
                     info.photographer, info.username
                 ));
                 self.error_message = None;
-                self.settings.last_photo = Some(info);
-                let _ = self.store.save(&self.settings);
+                self.config.last_photo = Some(info);
+                let _ = self.store.save(&self.config);
             }
             Err(err) => {
                 self.status_message = None;
@@ -298,7 +340,7 @@ impl UnsplashApplet {
             has_status = true;
         }
 
-        if let Some(last) = &self.settings.last_photo {
+        if let Some(last) = &self.config.last_photo {
             let mut attribution = format!(
                 "Current: Photo by {} (@{}) on Unsplash [{}x{}]",
                 last.photographer, last.username, last.width, last.height
@@ -317,15 +359,15 @@ impl UnsplashApplet {
     fn credentials_section(&self, space_xs: u16) -> Element<'_, Message> {
         Column::new()
             .spacing(space_xs)
-            .push(text::heading("Unsplash API Key"))
+            .push(text::heading(fl!("unsplash-api-key")))
             .push(
                 Column::new()
                     .spacing(4)
-                    .push(text::caption("Access Key (Client-ID)"))
+                    .push(text::caption(fl!("access-key-label")))
                     .push(
                         secure_input(
-                            "Paste your Unsplash Access Key...",
-                            &self.settings.access_key,
+                            fl!("access-key-placeholder"),
+                            &self.config.access_key,
                             Some(Message::ToggleAccessKeyVisibility),
                             self.hide_access_key,
                         )
@@ -338,18 +380,15 @@ impl UnsplashApplet {
     fn search_section(&self, space_xs: u16) -> Element<'_, Message> {
         Column::new()
             .spacing(space_xs)
-            .push(text::heading("Search & Filter Options"))
+            .push(text::heading(fl!("search-filter-options")))
             .push(
                 Column::new()
                     .spacing(4)
-                    .push(text::caption("Search Terms (query)"))
+                    .push(text::caption(fl!("search-terms-label")))
                     .push(
-                        text_input(
-                            "e.g. mountains, northern lights, space",
-                            &self.settings.query,
-                        )
-                        .on_input(Message::QueryChanged)
-                        .on_submit(|_| Message::FetchNow),
+                        text_input(fl!("search-terms-placeholder"), &self.config.query)
+                            .on_input(Message::QueryChanged)
+                            .on_submit(|_| Message::FetchNow),
                     ),
             )
             .push(
@@ -359,9 +398,9 @@ impl UnsplashApplet {
                         Column::new()
                             .spacing(4)
                             .width(Length::FillPortion(1))
-                            .push(text::caption("Topics (comma-separated)"))
+                            .push(text::caption(fl!("topics-label")))
                             .push(
-                                text_input("wallpapers, nature", &self.settings.topics)
+                                text_input(fl!("topics-placeholder"), &self.config.topics)
                                     .on_input(Message::TopicsChanged),
                             ),
                     )
@@ -369,55 +408,58 @@ impl UnsplashApplet {
                         Column::new()
                             .spacing(4)
                             .width(Length::FillPortion(1))
-                            .push(text::caption("Collections (IDs)"))
+                            .push(text::caption(fl!("collections-label")))
                             .push(
-                                text_input("e.g. 1053828", &self.settings.collections)
-                                    .on_input(Message::CollectionsChanged),
+                                text_input(
+                                    fl!("collections-placeholder"),
+                                    &self.config.collections,
+                                )
+                                .on_input(Message::CollectionsChanged),
                             ),
                     ),
             )
             .push(
                 Column::new()
                     .spacing(4)
-                    .push(text::caption("Photographer Username (optional)"))
+                    .push(text::caption(fl!("username-label")))
                     .push(
-                        text_input("e.g. unsplash", &self.settings.username)
+                        text_input(fl!("username-placeholder"), &self.config.username)
                             .on_input(Message::UsernameChanged),
                     ),
             )
             .push(
                 Row::new()
                     .align_y(Alignment::Center)
-                    .push(text::body("Featured Photos Only").width(Length::Fill))
-                    .push(toggler(self.settings.featured).on_toggle(Message::FeaturedToggled)),
+                    .push(text::body(fl!("featured-photos-only")).width(Length::Fill))
+                    .push(toggler(self.config.featured).on_toggle(Message::FeaturedToggled)),
             )
             .push(
                 Column::new()
                     .spacing(4)
-                    .push(text::caption("Orientation"))
+                    .push(text::caption(fl!("orientation")))
                     .push(segmented_selector(
                         Orientation::ALL.into_iter().map(|o| (o, o.label())),
-                        self.settings.orientation,
+                        self.config.orientation,
                         Message::OrientationSelected,
                     )),
             )
             .push(
                 Column::new()
                     .spacing(4)
-                    .push(text::caption("Content Safety Filter"))
+                    .push(text::caption(fl!("content-safety-filter")))
                     .push(segmented_selector(
                         ContentFilter::ALL.into_iter().map(|c| (c, c.label())),
-                        self.settings.content_filter,
+                        self.config.content_filter,
                         Message::ContentFilterSelected,
                     )),
             )
             .push(
                 Column::new()
                     .spacing(4)
-                    .push(text::caption("Image Quality / Resolution"))
+                    .push(text::caption(fl!("image-quality-resolution")))
                     .push(segmented_selector(
                         ImageResolution::ALL.into_iter().map(|r| (r, r.label())),
-                        self.settings.resolution,
+                        self.config.resolution,
                         Message::ResolutionSelected,
                     )),
             )
@@ -427,26 +469,26 @@ impl UnsplashApplet {
     fn desktop_section(&self, space_xs: u16) -> Element<'_, Message> {
         Column::new()
             .spacing(space_xs)
-            .push(text::heading("Desktop & Rotation"))
+            .push(text::heading(fl!("desktop-and-rotation")))
             .push(
                 Column::new()
                     .spacing(4)
-                    .push(text::caption("Wallpaper Scaling Mode"))
+                    .push(text::caption(fl!("wallpaper-scaling-mode")))
                     .push(segmented_selector(
                         WallpaperScalingMode::ALL
                             .into_iter()
                             .map(|m| (m, m.label())),
-                        self.settings.scaling_mode,
+                        self.config.scaling_mode,
                         Message::ScalingModeSelected,
                     )),
             )
             .push(
                 Column::new()
                     .spacing(4)
-                    .push(text::caption("Auto-Refresh Interval"))
+                    .push(text::caption(fl!("auto-refresh-interval")))
                     .push(segmented_selector(
-                        UnsplashSettings::REFRESH_PRESETS,
-                        self.settings.auto_refresh_minutes,
+                        Config::REFRESH_PRESETS,
+                        self.config.auto_refresh_minutes,
                         Message::AutoRefreshSelected,
                     )),
             )
@@ -463,9 +505,9 @@ impl UnsplashApplet {
         } = cosmic::theme::spacing();
 
         let fetch_btn_label = if self.is_fetching {
-            "Fetching..."
+            fl!("fetching")
         } else {
-            "New Wallpaper"
+            fl!("new-wallpaper")
         };
         let mut fetch_btn = button::suggested(fetch_btn_label);
         if !self.is_fetching {
@@ -475,10 +517,8 @@ impl UnsplashApplet {
         let header = Row::new()
             .push(
                 Column::new()
-                    .push(text::title4("Random Wallpaper"))
-                    .push(text::caption(
-                        "Wallpaper Applet for the COSMIC™ Desktop (Powered by Unsplash)",
-                    ))
+                    .push(text::title4(fl!("app-title")))
+                    .push(text::caption(fl!("app-comment")))
                     .width(Length::Fill),
             )
             .push(fetch_btn)
@@ -512,13 +552,13 @@ impl UnsplashApplet {
         };
         let middle_section = middle_col.push(form_body).height(middle_height);
 
-        let mut apply_btn = button::suggested("Save & Change Wallpaper");
+        let mut apply_btn = button::suggested(fl!("save-and-change-wallpaper"));
         if !self.is_fetching {
             apply_btn = apply_btn.on_press(Message::FetchNow);
         }
         let footer = Row::new()
             .spacing(space_xs)
-            .push(button::standard("Save Settings").on_press(Message::SaveSettings))
+            .push(button::standard(fl!("save-settings")).on_press(Message::SaveSettings))
             .push(apply_btn);
 
         Column::new()

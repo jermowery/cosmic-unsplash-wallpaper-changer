@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 use std::env;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};

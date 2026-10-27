@@ -18,6 +18,18 @@
   </description>
   <launchable type="desktop-id">io.github.jermowery.CosmicExtAppletRandomWallpaper.desktop</launchable>
   <icon type="stock">io.github.jermowery.CosmicExtAppletRandomWallpaper-symbolic</icon>
+  <provides>
+    <id>com.system76.CosmicApplet</id>
+    <binary>cosmic-ext-applet-random-wallpaper</binary>
+  </provides>
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+    <control>touch</control>
+  </supports>
   <url type="homepage">https://github.com/jermowery/cosmic-unsplash-wallpaper-changer</url>
   <url type="bugtracker">https://github.com/jermowery/cosmic-unsplash-wallpaper-changer/issues</url>
   <url type="vcs-browser">https://github.com/jermowery/cosmic-unsplash-wallpaper-changer</url>

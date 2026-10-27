@@ -1,10 +1,15 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 use std::borrow::Cow;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use cosmic::cosmic_config::{Config, ConfigGet, ConfigSet};
+use cosmic::cosmic_config::{
+    self, cosmic_config_derive::CosmicConfigEntry, Config as CosmicConfig, ConfigGet, ConfigSet,
+    CosmicConfigEntry,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::error::AppError;
@@ -190,10 +195,11 @@ pub struct LastPhotoInfo {
     pub file_path: PathBuf,
 }
 
-/// Persistent settings for the COSMIC Unsplash Wallpaper Applet.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// Persistent settings for the COSMIC Random Wallpaper Applet.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, CosmicConfigEntry)]
+#[version = 1]
 #[serde(default)]
-pub struct UnsplashSettings {
+pub struct Config {
     /// Unsplash API Access Key (`Client-ID`).
     pub access_key: String,
     /// Search terms (`query` parameter).
@@ -220,7 +226,9 @@ pub struct UnsplashSettings {
     pub last_photo: Option<LastPhotoInfo>,
 }
 
-impl Default for UnsplashSettings {
+pub type UnsplashSettings = Config;
+
+impl Default for Config {
     fn default() -> Self {
         Self {
             access_key: String::new(),
@@ -266,10 +274,10 @@ impl UnsplashSettings {
     }
 }
 
-/// Manages loading and saving `UnsplashSettings` via `cosmic-config` in `~/.config/cosmic/<APP_ID>/v1/settings`.
+/// Manages loading and saving [`Config`] via `cosmic-config` in `~/.config/cosmic/<APP_ID>/v1/settings`.
 #[derive(Clone, Debug)]
 pub struct SettingsStore {
-    config: Option<Config>,
+    config: Option<CosmicConfig>,
     fallback_path: PathBuf,
 }
 
@@ -287,22 +295,33 @@ impl SettingsStore {
             .join(APP_ID)
             .join(format!("v{CONFIG_VERSION}"))
             .join(SETTINGS_KEY);
-        let config = Config::new(APP_ID, CONFIG_VERSION).ok();
+        let config = CosmicConfig::new(APP_ID, Config::VERSION).ok();
         Self {
             config,
             fallback_path,
         }
     }
 
-    pub fn load(&self) -> UnsplashSettings {
+    pub fn load(&self) -> Config {
         if let Some(config) = &self.config {
-            if let Ok(settings) = config.get_local::<UnsplashSettings>(SETTINGS_KEY) {
+            if let Ok(settings) = config.get_local::<Config>(SETTINGS_KEY) {
+                let _ = settings.write_entry(config);
                 return settings;
             }
         }
         if let Ok(contents) = fs::read_to_string(&self.fallback_path) {
-            if let Ok(settings) = ron::from_str::<UnsplashSettings>(&contents) {
+            if let Ok(settings) = ron::from_str::<Config>(&contents) {
+                if let Some(config) = &self.config {
+                    let _ = settings.write_entry(config);
+                }
                 return settings;
+            }
+        }
+        if let Some(config) = &self.config {
+            if let Ok(entry) = Config::get_entry(config) {
+                if !entry.access_key.is_empty() || !entry.query.is_empty() {
+                    return entry;
+                }
             }
         }
         // Migrate settings from the legacy App ID if present.
@@ -310,13 +329,13 @@ impl SettingsStore {
             let _ = self.save(&legacy_settings);
             return legacy_settings;
         }
-        UnsplashSettings::default()
+        Config::default()
     }
 
-    fn load_legacy() -> Option<UnsplashSettings> {
+    fn load_legacy() -> Option<Config> {
         for legacy_id in LEGACY_APP_IDS {
-            if let Ok(legacy_cfg) = Config::new(legacy_id, CONFIG_VERSION) {
-                if let Ok(settings) = legacy_cfg.get_local::<UnsplashSettings>(SETTINGS_KEY) {
+            if let Ok(legacy_cfg) = CosmicConfig::new(legacy_id, CONFIG_VERSION) {
+                if let Ok(settings) = legacy_cfg.get_local::<Config>(SETTINGS_KEY) {
                     return Some(settings);
                 }
             }
@@ -326,7 +345,7 @@ impl SettingsStore {
                 .join(format!("v{CONFIG_VERSION}"))
                 .join(SETTINGS_KEY);
             if let Ok(contents) = fs::read_to_string(legacy_path) {
-                if let Ok(settings) = ron::from_str::<UnsplashSettings>(&contents) {
+                if let Ok(settings) = ron::from_str::<Config>(&contents) {
                     return Some(settings);
                 }
             }
@@ -338,8 +357,9 @@ impl SettingsStore {
     ///
     /// # Errors
     /// Returns [`AppError`] if the fallback directory cannot be created or the RON file cannot be written.
-    pub fn save(&self, settings: &UnsplashSettings) -> Result<(), AppError> {
+    pub fn save(&self, settings: &Config) -> Result<(), AppError> {
         if let Some(config) = &self.config {
+            let _ = settings.write_entry(config);
             if config.set(SETTINGS_KEY, settings).is_ok() {
                 return Ok(());
             }
