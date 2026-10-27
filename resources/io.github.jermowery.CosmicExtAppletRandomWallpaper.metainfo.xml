@@ -1,23 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>io.github.jermowery.CosmicExtAppletUnsplash</id>
+  <id>io.github.jermowery.CosmicExtAppletRandomWallpaper</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-only</project_license>
-  <name>Unsplash Wallpaper</name>
-  <summary>Fetch and configure desktop wallpapers from Unsplash for the COSMIC™ desktop</summary>
+  <name>Random Wallpaper</name>
+  <summary>Fetch and configure random desktop wallpapers for the COSMIC™ desktop</summary>
   <description>
     <p>
       A panel applet for the COSMIC™ desktop environment that fetches high-resolution
-      wallpapers from the Unsplash API and applies them directly to cosmic-bg.
+      random wallpapers (powered by the Unsplash API) and applies them directly to cosmic-bg.
     </p>
     <p>
-      Features include configurable Unsplash API credentials, search queries, topic and collection
+      Features include configurable API credentials, search queries, topic and collection
       filters, photographer filtering, orientation and safety filters, resolution selection,
       scaling modes, and automatic rotation intervals.
     </p>
   </description>
-  <launchable type="desktop-id">io.github.jermowery.CosmicExtAppletUnsplash.desktop</launchable>
-  <icon type="stock">io.github.jermowery.CosmicExtAppletUnsplash-symbolic</icon>
+  <launchable type="desktop-id">io.github.jermowery.CosmicExtAppletRandomWallpaper.desktop</launchable>
+  <icon type="stock">io.github.jermowery.CosmicExtAppletRandomWallpaper-symbolic</icon>
   <url type="homepage">https://github.com/jermowery/cosmic-unsplash-wallpaper-changer</url>
   <url type="bugtracker">https://github.com/jermowery/cosmic-unsplash-wallpaper-changer/issues</url>
   <url type="vcs-browser">https://github.com/jermowery/cosmic-unsplash-wallpaper-changer</url>
@@ -27,7 +27,7 @@
   <content_rating type="oars-1.1" />
   <screenshots>
     <screenshot type="default">
-      <caption>Unsplash Wallpaper Applet configuration dialog</caption>
+      <caption>Random Wallpaper Applet configuration dialog</caption>
       <image>https://raw.githubusercontent.com/jermowery/cosmic-unsplash-wallpaper-changer/main/resources/screenshot.png</image>
     </screenshot>
   </screenshots>

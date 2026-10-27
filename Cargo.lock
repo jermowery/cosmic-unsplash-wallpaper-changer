@@ -943,7 +943,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "cosmic-ext-applet-unsplash"
+name = "cosmic-ext-applet-random-wallpaper"
 version = "0.1.0"
 dependencies = [
  "dirs",

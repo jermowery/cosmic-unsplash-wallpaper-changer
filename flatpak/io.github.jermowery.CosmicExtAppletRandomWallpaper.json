@@ -1,12 +1,12 @@
 {
-    "id": "io.github.jermowery.CosmicExtAppletUnsplash",
+    "id": "io.github.jermowery.CosmicExtAppletRandomWallpaper",
     "runtime": "org.freedesktop.Platform",
     "runtime-version": "25.08",
     "sdk": "org.freedesktop.Sdk",
     "sdk-extensions": [
         "org.freedesktop.Sdk.Extension.rust-stable"
     ],
-    "command": "cosmic-ext-applet-unsplash",
+    "command": "cosmic-ext-applet-random-wallpaper",
     "finish-args": [
         "--socket=wayland",
         "--socket=fallback-x11",
@@ -18,7 +18,7 @@
     ],
     "modules": [
         {
-            "name": "cosmic-ext-applet-unsplash",
+            "name": "cosmic-ext-applet-random-wallpaper",
             "buildsystem": "simple",
             "build-options": {
                 "append-path": "/usr/lib/sdk/rust-stable/bin",
@@ -26,16 +26,16 @@
                     "--share=network"
                 ],
                 "env": {
-                    "CARGO_HOME": "/run/build/cosmic-ext-applet-unsplash/cargo"
+                    "CARGO_HOME": "/run/build/cosmic-ext-applet-random-wallpaper/cargo"
                 }
             },
             "build-commands": [
                 "if [ -d vendor ]; then cargo build --offline --release; else cargo build --release; fi",
-                "install -Dm0755 target/release/cosmic-ext-applet-unsplash ${FLATPAK_DEST}/bin/cosmic-ext-applet-unsplash",
-                "install -Dm0644 resources/io.github.jermowery.CosmicExtAppletUnsplash.desktop ${FLATPAK_DEST}/share/applications/io.github.jermowery.CosmicExtAppletUnsplash.desktop",
-                "install -Dm0644 resources/io.github.jermowery.CosmicExtAppletUnsplash.metainfo.xml ${FLATPAK_DEST}/share/metainfo/io.github.jermowery.CosmicExtAppletUnsplash.metainfo.xml",
-                "install -Dm0644 resources/icons/hicolor/scalable/apps/io.github.jermowery.CosmicExtAppletUnsplash.svg ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/io.github.jermowery.CosmicExtAppletUnsplash.svg",
-                "install -Dm0644 resources/icons/hicolor/scalable/apps/io.github.jermowery.CosmicExtAppletUnsplash-symbolic.svg ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/io.github.jermowery.CosmicExtAppletUnsplash-symbolic.svg"
+                "install -Dm0755 target/release/cosmic-ext-applet-random-wallpaper ${FLATPAK_DEST}/bin/cosmic-ext-applet-random-wallpaper",
+                "install -Dm0644 resources/io.github.jermowery.CosmicExtAppletRandomWallpaper.desktop ${FLATPAK_DEST}/share/applications/io.github.jermowery.CosmicExtAppletRandomWallpaper.desktop",
+                "install -Dm0644 resources/io.github.jermowery.CosmicExtAppletRandomWallpaper.metainfo.xml ${FLATPAK_DEST}/share/metainfo/io.github.jermowery.CosmicExtAppletRandomWallpaper.metainfo.xml",
+                "install -Dm0644 resources/icons/hicolor/scalable/apps/io.github.jermowery.CosmicExtAppletRandomWallpaper.svg ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/io.github.jermowery.CosmicExtAppletRandomWallpaper.svg",
+                "install -Dm0644 resources/icons/hicolor/scalable/apps/io.github.jermowery.CosmicExtAppletRandomWallpaper-symbolic.svg ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/io.github.jermowery.CosmicExtAppletRandomWallpaper-symbolic.svg"
             ],
             "sources": [
                 {

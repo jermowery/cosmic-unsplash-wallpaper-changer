@@ -21,8 +21,8 @@ on:
         type: string
 
 env:
-  APPID: io.github.jermowery.CosmicExtAppletUnsplash
-  BUNDLE_NAME: io.github.jermowery.CosmicExtAppletUnsplash.flatpak
+  APPID: io.github.jermowery.CosmicExtAppletRandomWallpaper
+  BUNDLE_NAME: io.github.jermowery.CosmicExtAppletRandomWallpaper.flatpak
 
 jobs:
   build-flatpak:

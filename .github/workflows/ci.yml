@@ -61,23 +61,23 @@ jobs:
 
       - name: Validate .desktop entry
         run: |
-          desktop-file-validate resources/io.github.jermowery.CosmicExtAppletUnsplash.desktop
+          desktop-file-validate resources/io.github.jermowery.CosmicExtAppletRandomWallpaper.desktop
 
       - name: Validate AppStream metainfo XML
         run: |
-          appstreamcli validate --no-net resources/io.github.jermowery.CosmicExtAppletUnsplash.metainfo.xml
+          appstreamcli validate --no-net resources/io.github.jermowery.CosmicExtAppletRandomWallpaper.metainfo.xml
 
       - name: Validate Flatpak manifest JSON
         run: |
           python3 -c '
           import json
-          appid = "io.github.jermowery.CosmicExtAppletUnsplash"
+          appid = "io.github.jermowery.CosmicExtAppletRandomWallpaper"
           with open(f"flatpak/{appid}.json", "r", encoding="utf-8") as f:
               manifest = json.load(f)
           actual_id = manifest.get("id")
           assert actual_id == appid, f"Expected {appid}, got {actual_id}"
           assert manifest["runtime"] == "org.freedesktop.Platform"
           assert manifest["sdk"] == "org.freedesktop.Sdk"
-          assert manifest["command"] == "cosmic-ext-applet-unsplash"
+          assert manifest["command"] == "cosmic-ext-applet-random-wallpaper"
           print("Flatpak manifest JSON valid.")
           '

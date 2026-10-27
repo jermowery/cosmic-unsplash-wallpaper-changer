@@ -1,12 +1,12 @@
 # AGENTS.md
 
-Instructions and maintenance guidelines for AI coding agents working in the `cosmic-ext-applet-unsplash` repository.
+Instructions and maintenance guidelines for AI coding agents working in the `cosmic-ext-applet-random-wallpaper` repository.
 
 ---
 
 ## 1. Project Overview
 
-`cosmic-ext-applet-unsplash` (`io.github.jermowery.CosmicExtAppletUnsplash`) is a native panel applet for the **System76 COSMIC Desktop Environment** built with `libcosmic` (`iced` + Wayland `xdg_popup`), `tokio`, and `reqwest` (`rustls-tls`). It fetches random photos from the Unsplash API (`GET /photos/random`) using user-configured search and filter parameters and applies them to the desktop via `cosmic-bg`.
+`cosmic-ext-applet-random-wallpaper` (`io.github.jermowery.CosmicExtAppletRandomWallpaper`) is a native panel applet for the **System76 COSMIC Desktop Environment** built with `libcosmic` (`iced` + Wayland `xdg_popup`), `tokio`, and `reqwest` (`rustls-tls`). It fetches random photos from the Unsplash API (`GET /photos/random`) using user-configured search and filter parameters and applies them to the desktop via `cosmic-bg`.
 
 ### Key Modules
 
@@ -16,11 +16,11 @@ Instructions and maintenance guidelines for AI coding agents working in the `cos
   3. Headless CLI one-shot mode (`--fetch-now`, `--save`, `--access-key`, `--query`, etc.)
 - [`src/error.rs`](src/error.rs): Structured `AppError` enum (`thiserror`) covering HTTP, JSON, RON, I/O, and CLI validation errors.
 - [`src/window.rs`](src/window.rs): `cosmic::Application` state machine, panel symbolic icon button, Wayland popup dialog layout, and `Subscription` timer for automatic wallpaper rotation.
-- [`src/config.rs`](src/config.rs): `UnsplashSettings` data structures and `SettingsStore` persistence backed by `cosmic-config` (`~/.config/cosmic/io.github.jermowery.CosmicExtAppletUnsplash/v1/settings`).
+- [`src/config.rs`](src/config.rs): `UnsplashSettings` data structures and `SettingsStore` persistence backed by `cosmic-config` (`~/.config/cosmic/io.github.jermowery.CosmicExtAppletRandomWallpaper/v1/settings`).
 - [`src/unsplash.rs`](src/unsplash.rs): Async Unsplash API client (`build_random_photo_url`, `select_download_url`, `fetch_and_apply_wallpaper`), `download_location` event reporting, and image downloading.
 - [`src/wallpaper.rs`](src/wallpaper.rs): Atomic RON config writer for `~/.config/cosmic/com.system76.CosmicBackground/v1/all` (`set_cosmic_wallpaper`) and cache pruning (`prune_old_wallpapers`).
 - [`build.rs`](build.rs) & [`pkgconfig/`](pkgconfig/): Ensures `libxkbcommon.so` and `xkbcommon.pc` resolve cleanly even on hosts where only the runtime `libxkbcommon.so.0` package is installed.
-- [`flatpak/io.github.jermowery.CosmicExtAppletUnsplash.json`](flatpak/io.github.jermowery.CosmicExtAppletUnsplash.json): Flatpak manifest built on `org.freedesktop.Platform//25.08`, `org.freedesktop.Sdk//25.08`, and `org.freedesktop.Sdk.Extension.rust-stable//25.08`.
+- [`flatpak/io.github.jermowery.CosmicExtAppletRandomWallpaper.json`](flatpak/io.github.jermowery.CosmicExtAppletRandomWallpaper.json): Flatpak manifest built on `org.freedesktop.Platform//25.08`, `org.freedesktop.Sdk//25.08`, and `org.freedesktop.Sdk.Extension.rust-stable//25.08`.
 
 ---
 
@@ -56,7 +56,7 @@ Activate and follow these workspace skills when performing related maintenance t
 - Do **not** pin a `rev = ...` on `[dependencies.libcosmic]` in `Cargo.toml`; `cosmic-panel` depends on `libcosmic` without a `rev`, so `Cargo.lock` alone must pin the exact commit to avoid duplicate `libcosmic` graph nodes during Flatpak cargo vendoring.
 
 ### UI Performance & Responsiveness
-- **Always install `--release` binaries**: `libcosmic` applets use `iced_tiny_skia` (CPU rendering) and `cosmic-text` (font shaping). Debug builds (`opt-level = 0`) cause severe scrolling and typing lag. Always use `make install` (which builds `--release`) when installing to `~/.local/bin/cosmic-ext-applet-unsplash`.
+- **Always install `--release` binaries**: `libcosmic` applets use `iced_tiny_skia` (CPU rendering) and `cosmic-text` (font shaping). Debug builds (`opt-level = 0`) cause severe scrolling and typing lag. Always use `make install` (which builds `--release`) when installing to `~/.local/bin/cosmic-ext-applet-random-wallpaper`.
 - **No disk I/O on keystrokes**: Never call `self.persist_quietly()` or `store.save()` inside `TextInput::on_input` handlers (`Message::AccessKeyChanged`, `Message::QueryChanged`, `Message::TopicsChanged`, `Message::CollectionsChanged`, `Message::UsernameChanged`). Only persist settings on button clicks (`SaveSettings`, `FetchNow`, enum selectors), popup close (`PopupClosed`, `TogglePopup`), or CLI `--save`.
 
 ### Wayland Popup Layout Invariants (`src/window.rs`)

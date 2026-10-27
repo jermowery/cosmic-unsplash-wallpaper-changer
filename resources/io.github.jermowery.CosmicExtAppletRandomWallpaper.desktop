@@ -1,0 +1,15 @@
+[Desktop Entry]
+Name=Random Wallpaper
+Comment=Fetch and set random wallpapers for the COSMIC™ desktop (Powered by Unsplash)
+Type=Application
+Exec=cosmic-ext-applet-random-wallpaper
+Terminal=false
+Categories=Utility;X-COSMIC;
+Keywords=COSMIC;Applet;Wallpaper;Random;Background;
+Icon=io.github.jermowery.CosmicExtAppletRandomWallpaper-symbolic
+StartupNotify=true
+NoDisplay=true
+X-CosmicApplet=true
+X-CosmicShrinkable=true
+X-HostWaylandDisplay=true
+X-CosmicHoverPopup=Auto

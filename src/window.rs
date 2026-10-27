@@ -18,7 +18,7 @@ use crate::config::{
 use crate::unsplash::fetch_and_apply_wallpaper;
 use crate::wallpaper::set_cosmic_wallpaper;
 
-const ICON_SYMBOLIC: &str = "io.github.jermowery.CosmicExtAppletUnsplash-symbolic";
+const ICON_SYMBOLIC: &str = "io.github.jermowery.CosmicExtAppletRandomWallpaper-symbolic";
 
 pub struct UnsplashApplet {
     core: Core,
@@ -273,7 +273,7 @@ impl UnsplashApplet {
         match result {
             Ok(info) => {
                 self.status_message = Some(format!(
-                    "Wallpaper updated: Photo by {} (@{})",
+                    "Wallpaper updated: Photo by {} (@{}) on Unsplash",
                     info.photographer, info.username
                 ));
                 self.error_message = None;
@@ -300,7 +300,7 @@ impl UnsplashApplet {
 
         if let Some(last) = &self.settings.last_photo {
             let mut attribution = format!(
-                "Current: Photo by {} (@{}) [{}x{}]",
+                "Current: Photo by {} (@{}) on Unsplash [{}x{}]",
                 last.photographer, last.username, last.width, last.height
             );
             if let Some(desc) = &last.description {
@@ -475,8 +475,10 @@ impl UnsplashApplet {
         let header = Row::new()
             .push(
                 Column::new()
-                    .push(text::title4("Unsplash Wallpaper"))
-                    .push(text::caption("Wallpaper Applet for the COSMIC™ Desktop"))
+                    .push(text::title4("Random Wallpaper"))
+                    .push(text::caption(
+                        "Wallpaper Applet for the COSMIC™ Desktop (Powered by Unsplash)",
+                    ))
                     .width(Length::Fill),
             )
             .push(fetch_btn)

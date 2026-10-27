@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use thiserror::Error;
 
-/// Unified domain error type for `cosmic-applet-unsplash`.
+/// Unified domain error type for `cosmic-ext-applet-random-wallpaper`.
 #[derive(Debug, Error)]
 pub enum AppError {
     #[error("Please enter your Unsplash Access Key in the settings above.")]

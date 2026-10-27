@@ -1,9 +1,9 @@
 [package]
-name = "cosmic-ext-applet-unsplash"
+name = "cosmic-ext-applet-random-wallpaper"
 version = "0.1.0"
 edition = "2021"
 license = "GPL-3.0-only"
-description = "A panel applet for the COSMIC™ desktop that fetches and sets wallpapers from Unsplash."
+description = "A random wallpaper panel applet for the COSMIC™ desktop, powered by the Unsplash API."
 repository = "https://github.com/jermowery/cosmic-unsplash-wallpaper-changer"
 
 [dependencies]

@@ -1,5 +1,5 @@
-NAME := cosmic-ext-applet-unsplash
-APPID := io.github.jermowery.CosmicExtAppletUnsplash
+NAME := cosmic-ext-applet-random-wallpaper
+APPID := io.github.jermowery.CosmicExtAppletRandomWallpaper
 PREFIX ?= $(HOME)/.local
 
 .PHONY: all build release run run-window test fmt fmt-check lint check audit setup-hooks install uninstall vendor flatpak-build flatpak-install clean
