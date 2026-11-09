@@ -44,6 +44,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.1.1" date="2026-11-09">
+      <description>
+        <p>Restructured to follow the COSMIC applet template, added Fluent localization, and updated dependencies.</p>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-10-25" />
   </releases>
   <categories>

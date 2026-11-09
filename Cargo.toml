@@ -1,13 +1,13 @@
 [package]
 name = "cosmic-ext-applet-random-wallpaper"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "GPL-3.0-only"
 description = "A random wallpaper panel applet for the COSMIC™ desktop, powered by the Unsplash API."
 repository = "https://github.com/jermowery/cosmic-unsplash-wallpaper-changer"
 
 [dependencies]
-dirs = "6"
+dirs = "7"
 i18n-embed-fl = "0.10"
 ron = "0.12"
 rust-embed = "8.11"
