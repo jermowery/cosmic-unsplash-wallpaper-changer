@@ -22,6 +22,7 @@ use crate::unsplash::fetch_and_apply_wallpaper;
 use crate::wallpaper::set_cosmic_wallpaper;
 
 const ICON_SYMBOLIC: &str = "io.github.jermowery.CosmicExtAppletRandomWallpaper-symbolic";
+const APP_VERSION: &str = concat!("v", env!("CARGO_PKG_VERSION"));
 
 /// The application model stores app-specific state used to describe its interface and
 /// drive its logic.
@@ -514,10 +515,16 @@ impl AppModel {
             fetch_btn = fetch_btn.on_press(Message::FetchNow);
         }
 
+        let title_row = Row::new()
+            .push(text::title4(fl!("app-title")))
+            .push(text::caption(APP_VERSION))
+            .align_y(Alignment::Center)
+            .spacing(space_xs);
+
         let header = Row::new()
             .push(
                 Column::new()
-                    .push(text::title4(fl!("app-title")))
+                    .push(title_row)
                     .push(text::caption(fl!("app-comment")))
                     .width(Length::Fill),
             )
