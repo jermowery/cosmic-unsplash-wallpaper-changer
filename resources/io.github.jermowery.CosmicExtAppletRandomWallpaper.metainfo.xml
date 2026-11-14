@@ -44,6 +44,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.1.3" date="2026-11-13">
+      <description>
+        <p>Option buttons now wrap onto multiple lines so their labels are never cut off.</p>
+      </description>
+    </release>
     <release version="0.1.2" date="2026-11-13">
       <description>
         <p>The settings popup now follows the COSMIC frosted (blur) setting for applets, and the version number is shown in the popup footer.</p>
