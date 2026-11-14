@@ -8,7 +8,7 @@ use cosmic::iced::window::Id;
 use cosmic::iced::{Alignment, Length, Limits, Subscription, Task};
 use cosmic::surface;
 use cosmic::widget::{
-    button, container, divider, mouse_area, scrollable, secure_input, space, text, text_input,
+    button, container, divider, flex_row, mouse_area, scrollable, secure_input, text, text_input,
     toggler, Column, Row,
 };
 use cosmic::Element;
@@ -528,7 +528,10 @@ impl AppModel {
             .push(
                 Column::new()
                     .push(text::title4(fl!("app-title")))
-                    .push(text::caption(fl!("app-comment")))
+                    .push(text::caption(format!(
+                        "{} · {APP_VERSION}",
+                        fl!("app-comment")
+                    )))
                     .width(Length::Fill),
             )
             .push(fetch_btn)
@@ -570,9 +573,7 @@ impl AppModel {
             .spacing(space_xs)
             .align_y(Alignment::Center)
             .push(button::standard(fl!("save-settings")).on_press(Message::SaveSettings))
-            .push(apply_btn)
-            .push(space::horizontal())
-            .push(text::caption(APP_VERSION));
+            .push(apply_btn);
 
         Column::new()
             .spacing(space_xs)
@@ -586,7 +587,9 @@ impl AppModel {
     }
 }
 
-/// Renders a horizontal row of option buttons where the active selection is highlighted.
+/// Renders option buttons where the active selection is highlighted. Uses a wrapping
+/// `flex_row` so options flow onto additional lines instead of being squeezed (and
+/// losing their labels) when they don't fit the popup width.
 fn segmented_selector<T, F>(
     options: impl IntoIterator<Item = (T, &'static str)>,
     selected: T,
@@ -596,16 +599,17 @@ where
     T: Copy + PartialEq,
     F: Fn(T) -> Message,
 {
-    options
+    let buttons = options
         .into_iter()
-        .fold(Row::new().spacing(4), |row, (value, label)| {
-            let btn = if value == selected {
+        .map(|(value, label)| {
+            if value == selected {
                 button::suggested(label)
             } else {
                 button::standard(label)
             }
-            .on_press(on_select(value));
-            row.push(btn)
+            .on_press(on_select(value))
+            .into()
         })
-        .into()
+        .collect();
+    flex_row(buttons).spacing(4).width(Length::Fill).into()
 }
