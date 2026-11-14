@@ -44,6 +44,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.1.2" date="2026-11-13">
+      <description>
+        <p>The settings popup now follows the COSMIC frosted (blur) setting for applets, and the version number is shown in the popup footer.</p>
+      </description>
+    </release>
     <release version="0.1.1" date="2026-11-09">
       <description>
         <p>Restructured to follow the COSMIC applet template, added Fluent localization, and updated dependencies.</p>

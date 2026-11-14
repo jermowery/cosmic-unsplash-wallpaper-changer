@@ -12,12 +12,12 @@ on:
       create_release:
         description: "Publish Flatpak bundle to a GitHub Release"
         required: false
-        default: true
+        default: false
         type: boolean
       release_tag:
-        description: "Tag name to publish when triggered manually (e.g. v0.1.0)"
+        description: "Existing tag to publish when triggered manually (e.g. v0.1.2)"
         required: false
-        default: "v0.1.0"
+        default: ""
         type: string
 
 env:
@@ -67,7 +67,10 @@ jobs:
             builddir \
             "flatpak/${APPID}.json"
 
+          # --runtime-repo embeds the Flathub remote so `flatpak install <bundle>`
+          # can fetch org.freedesktop.Platform on machines without Flathub configured.
           flatpak build-bundle \
+            --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo \
             repo \
             "${BUNDLE_NAME}" \
             "${APPID}"
@@ -94,7 +97,11 @@ jobs:
   publish-release:
     name: Publish Flatpak to GitHub Releases
     needs: build-flatpak
-    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.create_release == true)
+    # Only versioned tags (or an explicit manual run naming a tag) publish releases,
+    # so pushes to `main` never overwrite assets on an existing release.
+    if: >-
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+      (github.event_name == 'workflow_dispatch' && inputs.create_release && inputs.release_tag != '')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -108,11 +115,30 @@ jobs:
           name: flatpak-bundle
           path: dist
 
+      - name: Write release install instructions
+        run: |
+          cat > dist/RELEASE_NOTES.md <<EOF
+          ## Install
+
+          \`\`\`bash
+          curl -LO https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/${BUNDLE_NAME}
+          flatpak install --user ./${BUNDLE_NAME}
+          \`\`\`
+
+          Then open **COSMIC Settings → Desktop → Panel → Configure panel applets → Add applet** and choose **Random Wallpaper**.
+
+          You will need your own Unsplash Access Key; see the [README](https://github.com/${GITHUB_REPOSITORY}#getting-an-unsplash-api-key-required).
+          EOF
+        env:
+          RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || inputs.release_tag }}
+
       - name: Publish GitHub Release with Flatpak bundle
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || inputs.release_tag || 'v0.1.0' }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || inputs.release_tag }}
+          body_path: dist/RELEASE_NOTES.md
           generate_release_notes: true
+          make_latest: true
           files: |
             dist/${{ env.BUNDLE_NAME }}
             dist/${{ env.BUNDLE_NAME }}.sha256

@@ -11,6 +11,44 @@ A native panel applet for the **System76 COSMIC Desktop Environment** (`libcosmi
 
 ---
 
+## Install
+
+### Option A: Flatpak bundle from GitHub Releases (recommended)
+
+Requires the COSMIC™ desktop and `flatpak`. The bundle pulls the `org.freedesktop.Platform//25.08` runtime from Flathub automatically if you don't already have it.
+
+```bash
+curl -LO https://github.com/jermowery/cosmic-unsplash-wallpaper-changer/releases/latest/download/io.github.jermowery.CosmicExtAppletRandomWallpaper.flatpak
+flatpak install --user ./io.github.jermowery.CosmicExtAppletRandomWallpaper.flatpak
+```
+
+Each release also ships a `.sha256` checksum you can verify with `sha256sum -c`.
+
+### Option B: Build from source
+
+```bash
+sudo apt install build-essential pkg-config libwayland-dev libxkbcommon-dev
+git clone https://github.com/jermowery/cosmic-unsplash-wallpaper-changer.git
+cd cosmic-unsplash-wallpaper-changer
+make install   # installs to ~/.local (release build)
+```
+
+### Add it to your panel
+
+1. Open **COSMIC Settings → Desktop → Panel** (or **Dock**) **→ Configure panel applets**.
+2. Click **Add applet** and choose **Random Wallpaper**.
+3. Click the panel icon, paste your Unsplash **Access Key** ([how to get one](#getting-an-unsplash-api-key-required)), and click **New Wallpaper**.
+
+> [!NOTE]
+> Install only one of the two options. If you used both, the panel sees two applets with the same ID. Remove one with `flatpak uninstall io.github.jermowery.CosmicExtAppletRandomWallpaper` or `make uninstall`.
+
+### Update / uninstall
+
+- **Flatpak:** download the newer bundle and run the same `flatpak install --user ./…flatpak` command; uninstall with `flatpak uninstall io.github.jermowery.CosmicExtAppletRandomWallpaper`.
+- **From source:** `git pull && make install`; uninstall with `make uninstall`.
+
+---
+
 ## How It Works & Codebase Architecture
 
 `cosmic-ext-applet-random-wallpaper` is written in Rust on top of System76's [`libcosmic`](https://github.com/pop-os/libcosmic) toolkit (`iced` + Wayland layer-shell / `xdg_popup`) and `tokio` + `reqwest` (`rustls`).
