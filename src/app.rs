@@ -4,12 +4,12 @@ use std::time::Duration;
 
 use cosmic::app::Core;
 use cosmic::cosmic_theme::Spacing;
-use cosmic::iced::platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup};
 use cosmic::iced::window::Id;
 use cosmic::iced::{Alignment, Length, Limits, Subscription, Task};
+use cosmic::surface;
 use cosmic::widget::{
-    button, container, divider, mouse_area, scrollable, secure_input, text, text_input, toggler,
-    Column, Row,
+    button, container, divider, mouse_area, scrollable, secure_input, space, text, text_input,
+    toggler, Column, Row,
 };
 use cosmic::Element;
 
@@ -271,27 +271,36 @@ impl AppModel {
         }
     }
 
+    /// Opens or closes the popup through libcosmic's surface actions (rather than raw
+    /// `iced` popup commands) so the compositor applies the theme's frosted/blur
+    /// setting for applets, matching the official COSMIC applets.
     fn handle_toggle_popup(&mut self) -> Task<cosmic::Action<Message>> {
         if let Some(id) = self.popup.take() {
             self.persist_quietly();
-            destroy_popup(id)
-        } else {
-            let new_id = Id::unique();
-            self.popup = Some(new_id);
-            let mut popup_settings = self.core.applet.get_popup_settings(
-                self.core.main_window_id().unwrap_or(Id::RESERVED),
-                new_id,
-                None,
-                None,
-                None,
-            );
-            popup_settings.positioner.size_limits = Limits::NONE
-                .min_width(400.0)
-                .max_width(440.0)
-                .min_height(200.0)
-                .max_height(680.0);
-            get_popup(popup_settings)
+            return surface::surface_task(surface::action::destroy_popup(id));
         }
+
+        surface::surface_task(surface::action::app_popup(
+            |_: &Self| surface::action::LiveSettings::default(),
+            |app: &mut Self| {
+                let new_id = Id::unique();
+                app.popup = Some(new_id);
+                let mut popup_settings = app.core.applet.get_popup_settings(
+                    app.core.main_window_id().unwrap_or(Id::RESERVED),
+                    new_id,
+                    None,
+                    None,
+                    None,
+                );
+                popup_settings.positioner.size_limits = Limits::NONE
+                    .min_width(400.0)
+                    .max_width(440.0)
+                    .min_height(200.0)
+                    .max_height(680.0);
+                popup_settings
+            },
+            None,
+        ))
     }
 
     fn start_wallpaper_fetch(&mut self) -> Task<cosmic::Action<Message>> {
@@ -515,16 +524,10 @@ impl AppModel {
             fetch_btn = fetch_btn.on_press(Message::FetchNow);
         }
 
-        let title_row = Row::new()
-            .push(text::title4(fl!("app-title")))
-            .push(text::caption(APP_VERSION))
-            .align_y(Alignment::Center)
-            .spacing(space_xs);
-
         let header = Row::new()
             .push(
                 Column::new()
-                    .push(title_row)
+                    .push(text::title4(fl!("app-title")))
                     .push(text::caption(fl!("app-comment")))
                     .width(Length::Fill),
             )
@@ -565,8 +568,11 @@ impl AppModel {
         }
         let footer = Row::new()
             .spacing(space_xs)
+            .align_y(Alignment::Center)
             .push(button::standard(fl!("save-settings")).on_press(Message::SaveSettings))
-            .push(apply_btn);
+            .push(apply_btn)
+            .push(space::horizontal())
+            .push(text::caption(APP_VERSION));
 
         Column::new()
             .spacing(space_xs)
